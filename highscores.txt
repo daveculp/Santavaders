@@ -1,0 +1,10 @@
+dwculp,5770
+dwculp,3925
+dwculp,3600
+dwculp,3175
+Grinch,2500
+dwculp,1930
+dwculp,1740
+dwculp,1705
+Santa,1500
+Santa,1400
