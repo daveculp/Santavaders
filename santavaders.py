@@ -91,7 +91,7 @@ def display_title_screen():
 def reset_game():
     global santa_heads, present_list, santa_heads_pos, snowflakes, fireplaces
     global star_rect,game_data, current_player_image, current_player_mask
-    global santa_image, santa_width, santa_height
+    global santa_image, santa_width, santa_height, player_rect
     
     # Reset the game data dictionary back to original
     game_data = {   "game_state": GAME_STATE_RUNNING,
@@ -110,14 +110,19 @@ def reset_game():
                     "guided_bag_active": False,
                     "guided_bag_speed": 8,
                     "frame_rate": True,
-                    "santa_heads_speed_add": 0
+                    "santa_heads_speed_add": 0,
+                    "player_speed": 8
     }
+  
     
    
    
     #reset player and missile images
     current_player_image = player_image_star
     current_player_mask = pygame.mask.from_surface(player_image_star)
+    
+    player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
+    player_rect.y = SCREEN_HEIGHT - player_height
     #star_rect = star_image.get_rect()
 
     # Reset Santa sleigh time
@@ -222,6 +227,24 @@ def game_over():
     updated_high_scores = update_high_scores(player_name, player_score, high_scores)
     save_high_scores(updated_high_scores)  # Save the updated high scores
 
+    # Initial display of the last game scene with GAME OVER text
+    large_font = pygame.font.Font(font_path, 200)  # Set the font size to double the original
+    game_over_text = large_font.render("GAME OVER", True, (255, 0, 0))  # Red text
+    game_over_shadow = large_font.render("GAME OVER", True, (0, 255, 0))  # Green shadow
+    text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+    shadow_rect = game_over_shadow.get_rect(center=(SCREEN_WIDTH // 2 + 10, SCREEN_HEIGHT // 2 + 10))  # Slight offset for shadow
+
+    end_game_time = pygame.time.get_ticks() + 4000  # 4 seconds display
+
+    while pygame.time.get_ticks() < end_game_time:
+        screen.blit(game_over_shadow, shadow_rect)  # First the shadow
+        screen.blit(game_over_text, text_rect)  # Then the text
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type is pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+    # After 4 seconds, proceed to standard game over screen
     # Initialize snowflake properties
     snowflakes = [{"x": random.randint(0, SCREEN_WIDTH), "y": random.randint(0, SCREEN_HEIGHT),
                    "size": random.randint(1, 3), "speed": random.uniform(1, 3)}
@@ -229,51 +252,41 @@ def game_over():
 
     # Wait for user input
     waiting = True
-    start_time = pygame.time.get_ticks()
     while waiting:
         screen.fill((0, 0, 0))  # Clear the screen
-
-        # Update and draw snowflakes
         for snowflake in snowflakes:
-            snowflake["y"] += snowflake["speed"]  # Move snowflake down
-            if snowflake["y"] > SCREEN_HEIGHT:  # Reset snowflake if it goes off-screen
+            snowflake["y"] += snowflake["speed"]
+            if snowflake["y"] > SCREEN_HEIGHT:
                 snowflake["y"] = 0
                 snowflake["x"] = random.randint(0, SCREEN_WIDTH)
-                snowflake["size"] = random.randint(2, 5)
-                snowflake["speed"] = random.uniform(1, 3)
             pygame.draw.circle(screen, (255, 255, 255), (int(snowflake["x"]), int(snowflake["y"])), snowflake["size"])
 
-        # Game Over Text with green drop shadow
+        # Redisplay game over message and other info with shadow\
         game_over_shadow = font.render("GAME OVER", True, (0, 255, 0))  # Green shadow
         game_over_text = font.render("GAME OVER", True, (255, 0, 0))  # Red text
         screen.blit(game_over_shadow, (SCREEN_WIDTH // 2 - game_over_shadow.get_width() // 2 + 5, 10))  # Shadow offset
         screen.blit(game_over_text, (SCREEN_WIDTH // 2 - game_over_text.get_width() // 2, 5))  # Main text
-
-        # High Scores List
+        
         display_high_scores(updated_high_scores, player_name, player_score)
-
-        # Instructions
+        
         instructions_text = font.render("Press Q to Quit or SPACE to Restart", True, (255, 255, 255))
         y_offset = instructions_text.get_height()
         screen.blit(instructions_text, (SCREEN_WIDTH // 2 - instructions_text.get_width() // 2, SCREEN_HEIGHT - y_offset))
-
+        
         pygame.display.flip()
 
-        # Handle user input
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 game_data["game_state"] = GAME_STATE_QUIT
                 waiting = False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_q:  # Quit
+                if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
                     game_data["game_state"] = GAME_STATE_QUIT
                     waiting = False
-                if event.key == pygame.K_ESCAPE:  # Quit
-                    game_data["game_state"] = GAME_STATE_QUIT
-                    waiting = False
-                if event.key == pygame.K_SPACE and pygame.time.get_ticks()-start_time > 2000:  # Restart
+                if event.key == pygame.K_SPACE:
                     waiting = False
                     reset_game()
+
 
 
 def draw_scene(fps=False):
@@ -287,7 +300,7 @@ def draw_scene(fps=False):
         pygame.draw.circle(screen, (255, 255, 255), (int(snowflake["x"]), int(snowflake["y"])), snowflake["size"])
 
     #draw the player
-    player_rect = screen.blit(current_player_image, playerpos)
+    player_rect = screen.blit(current_player_image, (player_rect.x, player_rect.y))
     
     #draw the star missile if it is active
     if game_data["star_active"]:
@@ -556,7 +569,7 @@ def detect_collisions():
     bag_mask = pygame.mask.from_surface(bag_image)
     
     #detect collsions between the guided missile/bag and the players star
-    if game_data["guided_bag_active"]:
+    if game_data["guided_bag_active"] and game_data["star_active"]:
         if bag_rect.colliderect(star_rect):
             game_data["guided_bag_active"] = False
             game_data["star_active"] = False
@@ -732,22 +745,22 @@ def detect_collisions():
     
         
 def get_input():
-    global current_player_image, star_active, star_rect
+    global current_player_image, star_active, star_rect, player_rect
     global playerpos, game_data, current_player_mask 
     
     keys = pygame.key.get_pressed()
     if keys[pygame.K_LEFT]:
-        playerpos[0] -= player_speed
+        player_rect.x -= game_data["player_speed"]
         # Prevent moving off-screen
-        if playerpos[0] < 0:
-            playerpos[0] = 0
+        if player_rect.x < 0:
+            player_rect.x = 0
 
     # Move player right
     if keys[pygame.K_RIGHT]:
-        playerpos[0] += player_speed
+        player_rect.x += game_data["player_speed"]
         # Prevent moving off-screen
-        if playerpos[0] > SCREEN_WIDTH - player_width:
-            playerpos[0] = SCREEN_WIDTH - player_width
+        if player_rect.x > SCREEN_WIDTH - player_width:
+            player_rect.x = SCREEN_WIDTH - player_width
             
     # PLayer fire shot
     if keys[pygame.K_SPACE] or keys[pygame.K_UP]:
@@ -828,7 +841,7 @@ def start_next_level():
     santa_image = pygame.image.load(santa_image_file).convert_alpha()
     santa_width, santa_height = santa_image.get_size()
 
-    reset the postion of the upper left of the enemty formation
+    #reset the postion of the upper left of the enemty formation
     santa_heads_pos = [santa_x, 150+(game_data["current_level"]*20)]
     game_data["santa_heads_dir"] = LEFT
     
@@ -961,8 +974,10 @@ current_player_mask = pygame.mask.from_surface(player_image_star)
 current_player_image = player_image_star
 
 #set inital postion and velocity
+player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
+player_rect.y = SCREEN_HEIGHT - player_height
 playerpos = [SCREEN_WIDTH// 2 - player_width // 2, SCREEN_HEIGHT - player_height]
-player_speed = 6
+
 
 #***********************************************************************
 #*                       STAR/MISSILE SETUP                            *
@@ -1028,7 +1043,7 @@ for _ in range(150):
 fireplace_image = pygame.image.load("media/graphics/fireplace_small.png").convert_alpha()
 fireplace_width, fireplace_height = fireplace_image.get_size()
 fireplace_width, fireplace_height = fireplace_image.get_size()
-fireplace_y = playerpos[1]-fireplace_height-50 
+fireplace_y = player_rect.y-fireplace_height-50 
 
 # Calculate the gap width
 total_gap_space = SCREEN_WIDTH - (4 * fireplace_width)
@@ -1169,7 +1184,8 @@ game_data = {   "game_state": GAME_STATE_RUNNING,
                 "guided_bag_active": False,
                 "guided_bag_speed": 8,
                 "frame_rate": True,
-                "santa_heads_speed_add": 0
+                "santa_heads_speed_add": 0,
+                "player_speed": 8
 }
                 
                 
