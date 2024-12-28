@@ -1,4 +1,5 @@
 import pygame
+import math
 import time
 import random
 import datetime
@@ -12,7 +13,13 @@ import sys
 #***********************************************************************
 #*                       FUNCTIONS AREA                                *
 #***********************************************************************
-
+def play_next_song():
+    #if pygame.mixer.music.get_busy() == False:
+    song = random.choice(song_list)
+    pygame.mixer.music.load(song)
+    pygame.mixer.music.play(0)
+    print ("Playing: +",song)
+        
 def stereo_pan(x_pos):
     """Adjust the left and right volume based upon scren ccordinates """
     right_volume = float(x_pos) / SCREEN_WIDTH
@@ -60,13 +67,6 @@ def display_pause_screen():
                 if event.key == pygame.K_q:  # Quit game
                     game_data["game_state"] = GAME_STATE_QUIT
                     waiting = False
-
-def play_next_song():
-    if pygame.mixer.music.get_busy() == False:
-        song = random.choice(song_list)
-        pygame.mixer.music.load(song)
-        pygame.mixer.music.play(0)
-        print ("Playing: +",song)
         
 
 def display_title_screen():
@@ -91,36 +91,43 @@ def display_title_screen():
 def reset_game():
     global santa_heads, present_list, santa_heads_pos, snowflakes, fireplaces
     global star_rect,game_data, current_player_image, current_player_mask
+    global santa_image, santa_width, santa_height
     
-    # Reset game state
+    # Reset the game data dictionary back to original
     game_data = {   "game_state": GAME_STATE_RUNNING,
-                "running": True,
-                "player_score":0,
-                "high_score":0,
-                "current_level":1,
-                "game_sound_state": True,
-                "is_game_over": False,
-                "santa_head_points": 10,
-                "present_speed": 5,
-                "fireplaces_active": True,
-                "sleigh_time": 0,
-                "santa_sleigh_speed": 3,
-                "santa_sleigh_active": False,
-                "santa_heads_speed": 2,
-                "santa_sleigh_points": 300,
-                "santa_heads_dir": LEFT,
-                "star_active": False,
-                "star_speed": 8
+                    "running": True,
+                    "player_score":0,
+                    "high_score":0,
+                    "current_level":-1,
+                    "game_sound_state": True,
+                    "is_game_over": False,
+                    "fireplaces_active": True,
+                    "sleigh_time": 0,
+                    "santa_sleigh_active": False,       
+                    "santa_heads_dir": LEFT,
+                    "star_active": False,
+                    "star_speed": 10,
+                    "guided_bag_active": False,
+                    "guided_bag_speed": 8,
+                    "frame_rate": True,
+                    "santa_heads_speed_add": 0
     }
+    
    
+   
+    #reset player and missile images
     current_player_image = player_image_star
     current_player_mask = pygame.mask.from_surface(player_image_star)
-    star_rect = star_image.get_rect()
-    # Reset Santa sleigh
+    #star_rect = star_image.get_rect()
+
+    # Reset Santa sleigh time
     game_data["sleigh_time"] = pygame.time.get_ticks()
     
     # Reset Santa heads
     # Initialize santa_heads with dictionaries
+    santa_image_file = level_data[0]["image_file"]
+    santa_image = pygame.image.load(santa_image_file).convert_alpha()
+    santa_width, santa_height = santa_image.get_size()
     santa_heads = [
         [
         {"active": True, 
@@ -130,33 +137,29 @@ def reset_game():
         "explode_time": 0} for _ in range(11)]
         for _ in range(5)
     ]
-        
     santa_heads_pos = [santa_x, 150]
     
-    # Reset presents
+    # Reset active presents
     present_list = []
-    
-    # Reset fireplaces
+    # Reset active fireplaces
     fireplaces = []
     
     for i in range (4):
         x = (gap_width * (i + 1)) + (fireplace_width * i)
-        fireplace = { "x": x,
-                        "y": fireplace_y,
-                        "rect": fireplace_image.get_rect()
-                    }
+        fireplace = {
+            "active": True,
+            "x": x,
+            "y": fireplace_y,
+            "num_hit": 0,
+            "rect": fireplace_image.get_rect(),
+            "surface": fireplace_image.copy(),
+            "mask": pygame.mask.from_surface(fireplace_image),
+        }
         fireplaces.append( fireplace )
     fireplaces_active = True
     # Reset snowflakes
-    snowflakes = []
-    for _ in range(200):
-        snowflakes.append({
-            "x": random.randint(0, SCREEN_WIDTH),
-            "y": random.randint(0, SCREEN_HEIGHT),
-            "size": random.randint(2, 5),
-            "speed": random.uniform(1, 3),
-        })
 
+    start_next_level()
 
 # ***********************************************************************
 # *                       HIGH SCORES MANAGEMENT                       *
@@ -205,17 +208,13 @@ def display_high_scores(high_scores, player_name=None, player_score=None):
         line_height = score_text.get_height()
         screen.blit(score_text, (SCREEN_WIDTH // 2 - score_text.get_width() // 2, y_start + i * line_height))
 
-def get_os_username():
-    """Retrieve the current OS user's username."""
-    return getpass.getuser()
-
 # ***********************************************************************
 # *                     GAME OVER SCREEN                     *
 # ***********************************************************************
 
 def game_over():
     global game_data
-    player_name = get_os_username()  # Retrieve player username
+    player_name = getpass.getuser()  # Retrieve player username
     high_scores = load_high_scores()  # Load current high scores
 
     # Update the high scores with the player's score
@@ -278,7 +277,7 @@ def game_over():
 
 
 def draw_scene(fps=False):
-    global santa_heads, star_rect, santa_sleigh_rect
+    global santa_heads, star_rect, santa_sleigh_rect, bag_rect
     global player_rect, present_list, fireplaces, game_data 
     # Fill the background with black
     screen.fill((0, 0, 0))
@@ -286,16 +285,21 @@ def draw_scene(fps=False):
 # Draw snowflakes
     for snowflake in snowflakes:
         pygame.draw.circle(screen, (255, 255, 255), (int(snowflake["x"]), int(snowflake["y"])), snowflake["size"])
-        
-    player_rect = screen.blit(current_player_image, playerpos)
-    #pygame.draw.rect (screen, (0,255,0), player_rect,  2)
-    if game_data["star_active"]:
-        star_rect = screen.blit(star_image, star_pos)
-        #pygame.draw.rect (screen, (0,255,0), star_rect,  2)
 
+    #draw the player
+    player_rect = screen.blit(current_player_image, playerpos)
+    
+    #draw the star missile if it is active
+    if game_data["star_active"]:
+        star_rect = screen.blit(star_image, star_rect)
+        
+    #draw santa sleigh at the top if active
     if game_data["santa_sleigh_active"]:
-        santa_sleigh_rect = screen.blit(santa_sleigh_image, santa_sleigh_pos)
-        #pygame.draw.rect (screen, (0,255,0), santa_sleigh_rect,  2)
+        santa_sleigh_rect = screen.blit(santa_sleigh_image, santa_sleigh_rect)
+    
+    #draw santas guided bag missile if active
+    if game_data["guided_bag_active"]:
+        bag_rect = screen.blit(bag_image, bag_rect)
         
     #draw the santa heads
     for row in range(5):
@@ -317,24 +321,38 @@ def draw_scene(fps=False):
                 santa_heads[row][col]["rect"] = screen.blit(explosion_graphics[frame], [x_pos, y_pos] )
                 frame = frame + 1
                 if frame == len(explosion_graphics):
-                    #frame = 0
                     santa_heads[row][col]["exploding"] = False
                 santa_heads[row][col]["explode_frame"] = frame
                 santa_heads[row][col]["explode_time"] = time.time()
-                
-
-                    
-    #draw presents
-    if len(present_list) > 0:
+             
+    #draw presents if there are active presents in the list
+    if present_list:
         for p, present in enumerate(present_list):
             present_list[p] = screen.blit(present_image, present )
             #pygame.draw.rect (screen, (0,255,0), present,  2)
-            
-                
-    #draw fireplaces
+
+    #draw fireplaces using the eroded masks
     if game_data["fireplaces_active"]:
-        for i in range(4):
-            fireplaces[i]["rect"] = screen.blit(fireplace_image, [ fireplaces[i]["x"], fireplaces[i]["y"] ] )
+        for fireplace in fireplaces:
+            if fireplace["active"]:
+            # Create a surface where the mask is rendered
+                mask_surface = fireplace["mask"].to_surface(unsetcolor=(0, 0, 0, 0), setcolor=(255, 255, 255, 255))
+                # Create a new surface for the filtered fireplace
+                filtered_surface = pygame.Surface(fireplace["surface"].get_size(), pygame.SRCALPHA)
+                filtered_surface.blit(fireplace_image, (0, 0))  # Copy original fireplace image
+                filtered_surface.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)  # Apply the mask
+
+                # Blit the filtered surface to the screen
+                screen.blit(filtered_surface, (fireplace["x"], fireplace["y"]))
+
+    # draw explosions if there are any in the list
+    if explosion_list:
+        for explosion in explosion_list:
+            image_num = explosion["frame"]
+            image = explosion_graphics[image_num]
+            rect = explosion["rect"]
+            screen.blit(image, rect)
+            
         
     # Render the score text with a shadow effect
     player_score = game_data["player_score"]
@@ -348,13 +366,14 @@ def draw_scene(fps=False):
     text_width = score_text.get_width()
     x_position = SCREEN_WIDTH - text_width - 20
     y_position = 50
+    
     # Draw shadow slightly offset
     screen.blit(shadow_text, (x_position + 5, y_position + 5))
     # Draw the main text
     screen.blit(score_text, (x_position, y_position))
 
     # Render the level text with a shadow effect
-    current_level = game_data["current_level"]
+    current_level = game_data["current_level"]+1
     level_text = font.render(f"Level: {current_level}", True, (255, 0, 0))  # White text
     shadow_text = font.render(f"Level: {current_level}", True, (0, 128, 0))  # Green shadow
     
@@ -369,14 +388,6 @@ def draw_scene(fps=False):
     # Draw the main text
     screen.blit(level_text, (x_position, y_position))
 
-    # draw other explosions
-    for explosion in explosion_list:
-        image_num = explosion["frame"]
-        image = explosion_graphics[image_num]
-        rect = explosion["rect"]
-        screen.blit(image, rect)
-
-
     #draw FPSscreen.blit(playerimage, playerpos)
     if fps:
         fps = str(int(clock.get_fps()))
@@ -386,27 +397,51 @@ def draw_scene(fps=False):
 
         
 def update():
-    global star_pos, current_player_image, santa_sleigh_pos, snowflakes
+    global star_rect, current_player_image, santa_sleigh_rect, snowflakes
     global present_list, santa_sleigh_sound, game_data, explosion_list
     global current_player_mask
-      
+   
+    current_level = game_data["current_level"]
+
+    #if santas sleigh is not active, check if it appears
     if not game_data["santa_sleigh_active"]:
         if pygame.time.get_ticks() - game_data["sleigh_time"] > 10000:
-            if random.randint(1,101) < 2:
+            if random.randint(0,100) < 2:
                 game_data["santa_sleigh_active"] = True
-                santa_sleigh_pos = [0,20]
+                santa_sleigh_rect.x  = 0
+                santa_sleigh_rect.y = 20
                 play_sound(santa_sleigh_sound,SCREEN_WIDTH/2)
-                #santa_sleigh_sound.play()
-    else:
-        santa_sleigh_pos[0] += game_data["santa_sleigh_speed"]
-        if santa_sleigh_pos[0] > SCREEN_WIDTH:
+    else: #if santa sleigh is on the screen, update it and check bounds
+        santa_sleigh_rect.x += level_data[current_level]["santa_sleigh_speed"]
+        if santa_sleigh_rect.x > SCREEN_WIDTH:
             game_data["santa_sleigh_active"] = False
             santa_sleigh_sound.stop()
             game_data["sleigh_time"] = pygame.time.get_ticks()
-        
+
+    #update the direction and position of the guided bag/missile
+    if game_data["guided_bag_active"]:
+        # Calculate the horizontal distance between the missile and the player
+        distance_x = player_rect.centerx - bag_rect.centerx
+        # Calculate the scaled speed
+        speed_x = distance_x * .1
+        # Ensure the speed does not exceed the maximum allowed speed
+        speed_x = max(-15, min(15, speed_x))
+        bag_rect.y += game_data["guided_bag_speed"]
+        bag_rect.x += speed_x
+        if bag_rect.y > SCREEN_HEIGHT:
+            game_data["guided_bag_active"] = False
+            
+    #spawn a guided bag if necessary
+    if game_data["santa_sleigh_active"] and not game_data["guided_bag_active"]:
+        if random.randint(0,300) < 2:
+            bag_rect.x = santa_sleigh_rect.x
+            bag_rect.y = santa_sleigh_rect.y
+            game_data["guided_bag_active"] = True
+    
+    #update player star missile
     if game_data["star_active"]:
-        star_pos[1] -= game_data["star_speed"]
-        if star_pos[1]<=0:
+        star_rect.y -= game_data["star_speed"]
+        if star_rect.y <= 0:
             game_data["star_active"] = False
             current_player_image = player_image_star
             current_playher_mask = pygame.mask.from_surface(player_image_star)
@@ -414,20 +449,26 @@ def update():
     #update presents 
     present_list = [present for present in present_list if present.y <= SCREEN_HEIGHT]
     for present in present_list:
-        present.y += game_data["present_speed"]
+        present.y += level_data[current_level]["present_speed"]
 
-    #update explosions
-    for explosion in reversed(explosion_list):
+    #update the explosions in the explosion list
+    for i in range(len(explosion_list) - 1, -1, -1):  # iterate in reverse using index
+        explosion = explosion_list[i]
         if time.time() - explosion["time"] > EXPLOSION_FRAME_DURATION:
             explosion["frame"] += 1
             if explosion["frame"] == len(explosion_graphics):
-                explosion_list.remove(explosion)
-                continue
-            explosion["time"] = time.time()
-                        
-    # Generate a random Santa present
+                del explosion_list[i]  # delete by index
+            else:
+                explosion["time"] = time.time()
+      
+    #deativate fireplaces that receive too much damage
+    for fireplace in fireplaces:
+        if fireplace["num_hit"] > 12:
+            fireplace["active"] = False
+            
+    # Generate a random Santa present shot
     active_santas = [(row, col) for row in range(5) for col in range(11) if santa_heads[row][col]["active"]]
-    if active_santas and random.randint(0, 100) == 0:
+    if active_santas and random.randint(0, 101) < level_data[current_level]["santa_shot_chance"]:
         row, col = random.choice(active_santas)
         rect = santa_heads[row][col]["rect"]
         play_sound(santa_shoot_sound, rect.x)
@@ -435,12 +476,11 @@ def update():
     
     # Check Santa head movement limits and reverse direction if necessary
     reverse_direction = False
-
     for row in range(len(santa_heads)):
         for col in range(len(santa_heads[row])):
             if santa_heads[row][col]["active"]:  # Check if Santa head is active
-                santa_rect = santa_heads[row][col]["rect"]
-                if santa_rect.x <= 5 or santa_rect.x + santa_width >= SCREEN_WIDTH:
+                santa_rect = santa_heads[row][col]["rect"] #get the rectangle at that position
+                if santa_rect.x <= 0 or santa_rect.x + santa_width >= SCREEN_WIDTH:
                     reverse_direction = True
                     break
         if reverse_direction:
@@ -448,10 +488,12 @@ def update():
 
     if reverse_direction:
         game_data["santa_heads_dir"] *= -1  # Reverse direction
-        santa_heads_pos[1] += 15  # Move Santa heads down
+        santa_heads_pos[1] += 25  # Move Santa heads down
         
-    #move the santa head position
-    santa_heads_pos[0] += game_data["santa_heads_speed"] * game_data["santa_heads_dir"]
+    #move the santa head position of the structure
+    speed_add = game_data["santa_heads_speed_add"]
+    current_speed = level_data[current_level]["santa_heads_speed"]
+    santa_heads_pos[0] += (current_speed+speed_add) * game_data["santa_heads_dir"]
         
     # Update snowflakes
     for snowflake in snowflakes:
@@ -472,18 +514,71 @@ def update():
 
                 if alien_bottom >= playerpos[1]:  # Game Over Condition
                     print("GAME OVER!!!")
-                    is_game_over = True
+                    game_data["is_game_over"] = True
                     return  # Exit immediately
 
                 if game_data["fireplaces_active"] and alien_bottom >= fireplace_y:  # Fireplace Condition
                     game_data["fireplaces_active"] = False
                     return  # Exit immediately after deactivating fireplaces
     
-            
+def erode_fireplace(fireplace, center, radius):
+    """
+    Directly modify the fireplace mask by eroding bits in a circular area.
+    :param fireplace: Dictionary containing fireplace data (surface, mask, position).
+    :param center: (x, y) center of the erosion circle in world coordinates.
+    :param radius: Radius of the erosion circle.
+    """
+    # Convert world coordinates to local mask coordinates
+    local_center_x = center[0] - fireplace["x"]
+    local_center_y = center[1] - fireplace["y"]
+
+    # Iterate through the mask pixels within the erosion radius
+    for y in range(-radius, radius + 1):
+        for x in range(-radius, radius + 1):
+            if x ** 2 + y ** 2 <= radius ** 2:  # Check if the point is within the circle
+                mask_x = local_center_x + x
+                mask_y = local_center_y + y
+                if 0 <= mask_x < fireplace["mask"].get_size()[0] and 0 <= mask_y < fireplace["mask"].get_size()[1]:
+                    fireplace["mask"].set_at((mask_x, mask_y), 0)  # Turn the bit off
+
+    """
+    new_surface = pygame.Surface(fireplace["surface"].get_size(), pygame.SRCALPHA)
+    new_surface.fill((0, 0, 0, 0))  # Fully transparent
+    new_surface.blit(fireplace_image, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    fireplace["surface"] = fireplace["mask"].to_surface(unsetcolor=(0, 0, 0, 0), setcolor=(255, 255, 255, 255))
+    """
+
 def detect_collisions():
     global santa_heads, current_player_image, present_list,game_data
     global current_player_mask, explosion_list
+    current_level = game_data["current_level"]
     
+    bag_mask = pygame.mask.from_surface(bag_image)
+    
+    #detect collsions between the guided missile/bag and the players star
+    if game_data["guided_bag_active"]:
+        if bag_rect.colliderect(star_rect):
+            game_data["guided_bag_active"] = False
+            game_data["star_active"] = False
+            game_data["player_score"] += level_data[current_level]["guided_bag_points"]
+            play_sound(bang_sound, bag_rect.x)
+            rect = pygame.Rect(bag_rect.x,bag_rect.y, explosion_graphics[0].get_width(), explosion_graphics[0].get_height())
+            #spawn an explosion at this point
+            explosion = { "frame":0,
+                        "rect":rect,
+                        "time": time.time()
+                        }            
+            explosion_list.append(explosion)
+            
+    #check between the guided missile/bag and the player:
+    if game_data["guided_bag_active"]:
+        offset = (bag_rect.x - player_rect.x, bag_rect.y - player_rect.y)
+        if current_player_mask.overlap(bag_mask, offset):
+            play_sound(bang_sound, player_rect.x)
+            game_data["is_game_over"] = True
+            pygame.time.wait(2000)
+            return  # Exit the function immediately after ending the game
+            
     #check collsions between the star and santa heads
     if game_data["star_active"]:
         for row in range(5):
@@ -491,7 +586,7 @@ def detect_collisions():
                 if santa_heads[row][col]["active"]: #is there an active santa head here
                     santa_rect = santa_heads[row][col]["rect"]
                     if santa_rect.colliderect(star_rect):
-                        game_data["santa_heads_speed"] += .1
+                        game_data["santa_heads_speed_add"] += .1
                         play_sound(bang_sound, santa_rect.x)
                         santa_heads[row][col]["active"] = False
                         santa_heads[row][col]["exploding"] = True
@@ -500,32 +595,74 @@ def detect_collisions():
                         game_data["star_active"] = False
                         current_player_image = player_image_star
                         current_player_mask = pygame.mask.from_surface(player_image_star)
-                        game_data["player_score"] += game_data["santa_head_points"]
+                        game_data["player_score"] += level_data[current_level]["santa_head_points"]
                         break
-                        
-    #check collision between the star and fireplaces
-        if game_data["fireplaces_active"]:
-            for fireplace in fireplaces:
-                if star_rect.colliderect(fireplace["rect"]):
-                    game_data["star_active"] = False
-                    x = star_rect.x - explosion_graphics[0].get_width()//2
-                    y = star_rect.y - explosion_graphics[0].get_height()//2
-                    play_sound(bang_sound,x)
-                    rect = pygame.Rect(x,y, explosion_graphics[0].get_width(), explosion_graphics[0].get_height())
-                    explosion = { "frame":0,
-                                "rect":rect,
-                                "time": time.time()
-                                }            
-                    explosion_list.append(explosion)
-                    break
-    #check colliosions between a present and the player and fireplaces
-    # Initialize a new list for remaining presents
+
+
+    #deal only with active fireplaces                    
+    active_fireplaces = [fireplace for fireplace in fireplaces if fireplace["active"]]
+    
+    #detect collisions between the star and fireplaces and erode the fireplaces
+    if game_data["fireplaces_active"] and game_data["star_active"]:
+        for fireplace in active_fireplaces:
+            offset = (star_rect.x - fireplace["x"], star_rect.y - fireplace["y"])
+            if fireplace["mask"].overlap(star_mask, offset):
+                # Erode the fireplace
+                current_player_image = player_image_star
+                current_player_mask = pygame.mask.from_surface(player_image_star)
+                center = (star_rect.centerx, star_rect.centery)
+                erode_fireplace(fireplace, (star_rect.x, star_rect.y), explosion_graphics[0].get_width()//4)
+                game_data["star_active"] = False
+                x = star_rect.centerx - explosion_graphics[0].get_width()//2
+                y = star_rect.centery - explosion_graphics[0].get_height()//2
+                play_sound(bang_sound,x)
+                rect = pygame.Rect(x,y, explosion_graphics[0].get_width(), explosion_graphics[0].get_height())
+                explosion = { "frame":0,
+                            "rect":rect,
+                            "time": time.time()
+                            }            
+                explosion_list.append(explosion)
+                fireplace["num_hit"] += 1
+                
+    #now do the same check as above with the guideed santa bag/missile
+    if game_data["fireplaces_active"] and game_data["guided_bag_active"]: 
+        for fireplace in active_fireplaces:      
+            offset = (bag_rect.x - fireplace["x"], bag_rect.y - fireplace["y"])
+            if fireplace["mask"].overlap(bag_mask, offset):
+                game_data["guided_bag_active"] = False
+                # Play explosion sound and add visual feedback
+                x = bag_rect.centerx - explosion_graphics[0].get_width() // 2
+                y = bag_rect.centery - explosion_graphics[0].get_height() // 2
+                play_sound(bang_sound, x)
+                
+                rect = pygame.Rect(
+                    x, y, 
+                    explosion_graphics[0].get_width(), 
+                    explosion_graphics[0].get_height()
+                )
+                explosion = {
+                    "frame": 0,
+                    "rect": rect,
+                    "time": time.time()
+                }
+                explosion_list.append(explosion)
+                fireplace["num_hit"] += 1
+                # Erode the fireplace where the present hit
+                erode_fireplace(
+                    fireplace, 
+                    (bag_rect.centerx,bag_rect.centery), 
+                    explosion_graphics[0].get_width() // 3
+                )
+                
+    # Check collisions between a present and the player and fireplaces
+    # Initialize a new list for remaining presents.  If a present is NOT
+    #destroyed it gets added to this list
+    
     remaining_presents = []
 
     for present in present_list:
         # Check collision with the player
         offset = (present.x - player_rect.x, present.y - player_rect.y)
-        #if present.colliderect(player_rect):
         if current_player_mask.overlap(present_mask, offset):
             print("GAME OVER!!!")
             play_sound(bang_sound, player_rect.x)
@@ -536,19 +673,34 @@ def detect_collisions():
         # Check collision with presents and fireplaces
         collided_with_fireplace = False
         if game_data["fireplaces_active"]:
-            collided_with_fireplace = False
-            for fireplace in fireplaces:
-                if present.colliderect(fireplace["rect"]):
+            for fireplace in active_fireplaces:
+                offset = (present.x - fireplace["x"], present.y - fireplace["y"])
+                if fireplace["mask"].overlap(present_mask, offset):
                     collided_with_fireplace = True
-                    x = present.x - explosion_graphics[0].get_width()//2
-                    y = present.y - explosion_graphics[0].get_height() //2
-                    play_sound(bang_sound,x)
-                    rect = pygame.Rect(x,y, explosion_graphics[0].get_width(), explosion_graphics[0].get_height())
-                    explosion = { "frame":0,
-                                "rect":rect,
-                                "time": time.time()
-                                }            
+                    
+                    # Play explosion sound and add visual feedback
+                    x = present.centerx - explosion_graphics[0].get_width() // 2
+                    y = present.centery - explosion_graphics[0].get_height() // 2
+                    play_sound(bang_sound, x)
+                    
+                    rect = pygame.Rect(
+                        x, y, 
+                        explosion_graphics[0].get_width(), 
+                        explosion_graphics[0].get_height()
+                    )
+                    explosion = {
+                        "frame": 0,
+                        "rect": rect,
+                        "time": time.time()
+                    }
                     explosion_list.append(explosion)
+                    fireplace["num_hit"] += 1
+                    # Erode the fireplace where the present hit
+                    erode_fireplace(
+                        fireplace, 
+                        (present.centerx, present.bottom), 
+                        explosion_graphics[0].get_width() // 4
+                    )
                     break  # Stop checking once a collision is detected
 
         # If the present didn't collide with anything, keep it in the list
@@ -557,11 +709,12 @@ def detect_collisions():
 
     # Update the present_list with the remaining presents
     present_list = remaining_presents
+
             
     #finally check collisions between the star and the sleigh at the top                       
     if game_data["santa_sleigh_active"] and game_data["star_active"]:
         if star_rect.colliderect(santa_sleigh_rect):
-            game_data["player_score"] += game_data["santa_sleigh_points"]
+            game_data["player_score"] += level_data[current_level]["santa_sleigh_points"]
             game_data["santa_sleigh_active"] = False
             game_data["sleigh_time"] = pygame.time.get_ticks()
             game_data["star_active"] = False
@@ -569,6 +722,7 @@ def detect_collisions():
             current_player_mask = pygame.mask.from_surface(player_image_star)
             x = santa_sleigh_rect.x
             y = santa_sleigh_rect.y
+            play_sound(bang_sound, x)
             rect = pygame.Rect(x,y, explosion_graphics[0].get_width(), explosion_graphics[0].get_height())
             explosion = { "frame":0,
                             "rect":rect,
@@ -578,7 +732,7 @@ def detect_collisions():
     
         
 def get_input():
-    global current_player_image, star_active, star_pos, star_rect
+    global current_player_image, star_active, star_rect
     global playerpos, game_data, current_player_mask 
     
     keys = pygame.key.get_pressed()
@@ -596,15 +750,15 @@ def get_input():
             playerpos[0] = SCREEN_WIDTH - player_width
             
     # PLayer fire shot
-    if keys[pygame.K_SPACE]:
+    if keys[pygame.K_SPACE] or keys[pygame.K_UP]:
         if game_data["star_active"] == False:
             game_data["star_active"] = True
         current_player_image = player_image_nostar
         current_player_mask = pygame.mask.from_surface(player_image_nostar)
         play_sound(player_shoot_sound, playerpos[0])
-        #player_shoot_sound.play()
-        star_pos = [playerpos[0]+53, playerpos[1]]
-        star_rect = pygame.Rect(star_pos[0], star_pos[1], star_width, star_height)
+        x = player_rect.x+53
+        y = player_rect.y
+        star_rect = pygame.Rect(x, y, star_width, star_height)
         game_data["star_active"] = True 
 
 def check_game_end():
@@ -617,23 +771,35 @@ def check_level_end():
     global current_level
     # Check if there are any active Santas
     has_active_santas = any(santa["active"] for row in santa_heads for santa in row)
-
-    if not has_active_santas:
-        print("No more active Santas!")
+    
+    if not has_active_santas and game_data["santa_sleight_active"]:
         # Trigger level completion or game state change
+        pygame.time.wait(3000);
         start_next_level()
 
 def start_next_level():
     global  current_player_image, current_player_mask, star_rect,  santa_heads
     global santa_heads_pos, present_list, fireplaces, snowflakes
-    global game_data
+    global game_data, santa_image, santa_width, santa_height
      
     
-    pygame.time.wait(3000);
-    game_data["current_level"] = min(game_data["current_level"]+1, 10)
-    santa_heads_speed = 2 + game_data["current_level"]*2
+    #assume we have not completed all levels and we will not load a
+    #random enemy image
+    random_image = False
+    current_level = game_data["current_level"]
+    game_data["santa_heads_speed_add"] = 0
+
+    #check if we have completed all known levels.  If so, load a random
+    #enemy and use the last level data 
+    if current_level < len(level_data)-1:
+        current_level += 1
+        game_data["current_level"] = current_level
+    else:
+        random_image = True # after level 5, just cycle through random images
+
     game_data["star_active"] = False
 
+    #reset player images
     current_player_image = player_image_star
     current_player_mask = pygame.mask.from_surface(player_image_star)
     star_rect = star_image.get_rect()
@@ -653,13 +819,19 @@ def start_next_level():
         "explode_time": 0} for _ in range(11)]
         for _ in range(5)
     ]
+    if random_image:
+        image_num = random.randint(0,len(level_data)-1)
+    else:
+        image_num = current_level
+    #load the levels ebnemy image
+    santa_image_file = level_data[image_num]["image_file"]
+    santa_image = pygame.image.load(santa_image_file).convert_alpha()
+    santa_width, santa_height = santa_image.get_size()
 
-    santa_heads_pos = [santa_x, 150+(game_data["current_level"]*10)]
+    reset the postion of the upper left of the enemty formation
+    santa_heads_pos = [santa_x, 150+(game_data["current_level"]*20)]
     game_data["santa_heads_dir"] = LEFT
     
-    game_data["santa_sleigh_speed"] += 2
-    game_data["santa_sleigh_points"] += 100
-    game_data["santa_head_points"] += 5
     # Reset presents
     present_list = []
     
@@ -667,10 +839,15 @@ def start_next_level():
     fireplaces = []
     for i in range (4):
         x = (gap_width * (i + 1)) + (fireplace_width * i)
-        fireplace = { "x": x,
-                        "y": fireplace_y,
-                        "rect": fireplace_image.get_rect()
-                    }
+        fireplace = {
+            "active": True,
+            "x": x,
+            "y": fireplace_y,
+            "num_hit": 0,
+            "rect": fireplace_image.get_rect(),
+            "surface": fireplace_image.copy(),
+            "mask": pygame.mask.from_surface(fireplace_image),
+        }
         fireplaces.append( fireplace )
 
     game_data["fireplaces_active"] = True
@@ -683,20 +860,42 @@ def start_next_level():
             "size": random.randint(2, 5),
             "speed": random.uniform(1, 3),
         })
-    #game_data["game_state"] = GAME_STATE_RUNNING
-    #game_data["is_game_over"] = False
+        
+    game_data["guided_bag_active"] = False
+    play_next_song()
         
         
     
 #***********************************************************************
 #*                       PYGAME INIT and setup                         *
 #***********************************************************************
+resolutions = [
+    (1152, 864, 0.5625),
+    (1400, 1050,0.6836),
+    (1600, 1200,0.78125),
+    (1920, 1440,0.9375),
+    (2048, 1536,1)
+]
+
+# Initialize Pygame and open a window to get screen info
 pygame.init()
+info = pygame.display.Info()  # Get current display info
+screen_width = info.current_w
+screen_height = info.current_h
+max_resolution = (0, 0)
+for width, height, scale in resolutions:
+    if width <= screen_width and height <= screen_height:
+        max_resolution = (width, height, scale)
+print("Best resolution for this screen:", max_resolution)
 LEFT = -1
 RIGHT = 1
 
-SCREEN_WIDTH = 2048
-SCREEN_HEIGHT = 1536
+#SCREEN_WIDTH = 1152
+#SCREEN_HEIGHT = 864
+
+SCREEN_WIDTH = max_resolution[0]
+SCREEN_HEIGHT = max_resolution[1]
+SCALE_FACTOR = max_resolution[2]
 # Set up the drawing window
 screen = pygame.display.set_mode( (SCREEN_WIDTH, SCREEN_HEIGHT) )
 pygame.display.set_caption("Santavaders")
@@ -744,7 +943,7 @@ font = pygame.font.Font(font_path, 100)  # Large font size for boldness
 #*                       TITLE IMAGES                                  *
 #***********************************************************************
 # Load the title screen image
-title_screen_image = pygame.image.load("media/graphics/title_screen.png")
+title_screen_image = pygame.image.load("media/graphics/title_screen.png").convert_alpha()
 title_screen_image = pygame.transform.scale(title_screen_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
 
@@ -752,8 +951,8 @@ title_screen_image = pygame.transform.scale(title_screen_image, (SCREEN_WIDTH, S
 #*                       PLAYER IMAGE AND SETUP                        *
 #***********************************************************************
 
-player_image_star = pygame.image.load("media/graphics/treewstar_small.png")
-player_image_nostar = pygame.image.load("media/graphics/treenostar_small.png")
+player_image_star = pygame.image.load("media/graphics/treewstar_small.png").convert_alpha()
+player_image_nostar = pygame.image.load("media/graphics/treenostar_small.png").convert_alpha()
 
 player_width, player_height = player_image_star.get_size()
 player_rect = player_image_nostar.get_rect() 
@@ -763,24 +962,29 @@ current_player_image = player_image_star
 
 #set inital postion and velocity
 playerpos = [SCREEN_WIDTH// 2 - player_width // 2, SCREEN_HEIGHT - player_height]
-player_speed = 5
+player_speed = 6
 
 #***********************************************************************
 #*                       STAR/MISSILE SETUP                            *
 #***********************************************************************
-#star_active = False
-star_image = pygame.image.load("media/graphics/star_small.png")
+star_image = pygame.image.load("media/graphics/star_small.png").convert_alpha()
 star_width, star_height = star_image.get_size()
 star_rect = star_image.get_rect()
-star_pos = [0,0]
-#star_speed = 8
+star_mask = pygame.mask.from_surface(star_image)
 
+#***********************************************************************
+#*                       SANTAS GUIDED MISSILE/BAG                     *
+#***********************************************************************
+bag_image = pygame.image.load("media/graphics/guided_bag_small.png").convert_alpha()
+bag_width, bag_height = bag_image.get_size()
+bag_rect = star_image.get_rect()
+sbag_mask = pygame.mask.from_surface(bag_image)
 
 #***********************************************************************
 #*                       SANTA HEADS SETUP                             *
 #***********************************************************************
 
-santa_image = pygame.image.load("media/graphics/santa_head_small.png")
+santa_image = pygame.image.load("media/graphics/santa_head_small2.png").convert_alpha()
 santa_width, santa_height = santa_image.get_size()
 
 # Initialize santa_heads with dictionaries
@@ -800,8 +1004,7 @@ santa_heads_pos = [santa_x, 130]
 #***********************************************************************
 #*                       SANTA SLEIGH                                  *
 #***********************************************************************
-santa_sleigh_image = pygame.image.load("media/graphics/santa_sleigh_small.png")
-santa_sleigh_pos = [0,20]
+santa_sleigh_image = pygame.image.load("media/graphics/santa_sleigh_small.png").convert_alpha()
 santa_sleigh_rect = santa_sleigh_image.get_rect()
 #sleigh_time = pygame.time.get_ticks()
 
@@ -822,7 +1025,7 @@ for _ in range(150):
 #***********************************************************************
 #*                       FIREPLACE/SHIELDS SETUP                       *
 #***********************************************************************
-fireplace_image = pygame.image.load("media/graphics/fireplace_small.png")
+fireplace_image = pygame.image.load("media/graphics/fireplace_small.png").convert_alpha()
 fireplace_width, fireplace_height = fireplace_image.get_size()
 fireplace_width, fireplace_height = fireplace_image.get_size()
 fireplace_y = playerpos[1]-fireplace_height-50 
@@ -835,10 +1038,15 @@ gap_width = total_gap_space / (4 + 1)
 fireplaces = []
 for i in range (4):
     x = (gap_width * (i + 1)) + (fireplace_width * i)
-    fireplace = { "x": x,
-                    "y": fireplace_y,
-                    "rect": fireplace_image.get_rect()
-                }
+    fireplace = {
+        "active": True,
+        "x": x,
+        "y": fireplace_y,
+        "num_hit": 0,
+        "rect": fireplace_image.get_rect(),
+        "surface": fireplace_image.copy(),
+        "mask": pygame.mask.from_surface(fireplace_image),
+    }
     fireplaces.append( fireplace )
 #fireplaces_active = True
 
@@ -846,7 +1054,7 @@ for i in range (4):
 #***********************************************************************
 #*                       PRESENT/ENEMY BULLETS SETUP                   *
 #***********************************************************************
-present_image = pygame.image.load("media/graphics/present_small.png")
+present_image = pygame.image.load("media/graphics/present_small.png").convert_alpha()
 present_mask = pygame.mask.from_surface(present_image)
 present_width, present_height = present_image.get_size()
 present_width, present_height = present_image.get_size()
@@ -859,8 +1067,7 @@ explosion_graphics =[]
 explosion_list = []
 for i in range(7):
     filename = "media/graphics/explosion"+str(i+1)+".png"
-    print(filename)
-    explosion =  pygame.image.load(filename)
+    explosion =  pygame.image.load(filename).convert_alpha()
     explosion_graphics.append(explosion)
 
 #***********************************************************************
@@ -881,7 +1088,65 @@ game_state = GAME_STATE_TITLE #set initial game state
 # Run until the user asks to quit
 running = True
 
+#***********************************************************************
+#*                       levl info                                     *
+#***********************************************************************
 
+level_data = [ { "image_file": "media/graphics/santa_head_small2.png",
+                "santa_heads_speed": 2,
+                "santa_sleigh_speed": 2,
+                "santa_sleigh_points": 300,
+                "santa_head_points": 10,
+                "santa_shot_chance": 1,
+                "guided_bag_points": 25,
+                "present_speed": 6
+                },
+                
+{ "image_file": "media/graphics/candy_cane_small.png",
+                "santa_heads_speed": 3,
+                "santa_sleigh_speed": 3,
+                "santa_sleigh_points": 400,
+                "santa_head_points": 15,
+                "santa_shot_chance": 1,
+                "guided_bag_points": 25,
+                "present_speed": 7
+                },
+                
+{ "image_file": "media/graphics/santa_hat_small.png",
+                "santa_heads_speed": 7,
+                "santa_sleigh_speed": 4,
+                "santa_sleigh_points": 400,
+                "santa_head_points": 15,
+                "santa_shot_chance": 2,
+                "guided_bag_points": 25,
+                "present_speed": 7
+                },
+                
+{ "image_file": "media/graphics/tree_decoration_small.png",
+                "santa_heads_speed": 8,
+                "santa_sleigh_speed": 5,
+                "santa_sleigh_points": 500,
+                "santa_head_points": 20,
+                "santa_shot_chance": 2,
+                "guided_bag_points": 25,
+                "present_speed": 8
+                },
+                
+{ "image_file": "media/graphics/christmas_wreath_small.png",
+                "santa_heads_speed": 10,
+                "santa_sleigh_speed": 6,
+                "santa_sleigh_points": 600,
+                "santa_head_points": 25,
+                "santa_shot_chance": 3,
+                "guided_bag_points": 25,
+                "present_speed": 10
+                }
+                ]
+                
+                               
+                
+                
+                
  
 #***********************************************************************
 #*                       General game info                             *
@@ -892,20 +1157,19 @@ game_data = {   "game_state": GAME_STATE_RUNNING,
                 "running": True,
                 "player_score":0,
                 "high_score":0,
-                "current_level":1,
+                "current_level":-1,
                 "game_sound_state": True,
                 "is_game_over": False,
-                "santa_head_points": 10,
-                "present_speed": 5,
                 "fireplaces_active": True,
                 "sleigh_time": 0,
-                "santa_sleigh_speed": 3,
-                "santa_sleigh_active": False,
-                "santa_heads_speed": 2,
-                "santa_sleigh_points": 300,
+                "santa_sleigh_active": False,       
                 "santa_heads_dir": LEFT,
                 "star_active": False,
-                "star_speed": 8
+                "star_speed": 10,
+                "guided_bag_active": False,
+                "guided_bag_speed": 8,
+                "frame_rate": True,
+                "santa_heads_speed_add": 0
 }
                 
                 
@@ -926,7 +1190,7 @@ clock = pygame.time.Clock()
 clock.tick(10)
 pygame.mixer.music.play(0)
 clock.tick(10)
-
+start_next_level()
 while game_data["game_state"] != GAME_STATE_QUIT:
 
     # Did the user click the window close button?
@@ -938,6 +1202,8 @@ while game_data["game_state"] != GAME_STATE_QUIT:
                 game_data["game_state"] = GAME_STATE_QUIT
             if event.key == pygame.K_p:
                 game_data["game_state"] = GAME_STATE_PAUSED
+            if event.key == pygame.K_f:
+                game_data["frame_rate"] = not game_data["frame_rate"]
         if event.type == END_MUSIC_EVENT:
             play_next_song()
             
@@ -951,7 +1217,7 @@ while game_data["game_state"] != GAME_STATE_QUIT:
         get_input()
         update()
         detect_collisions()
-        draw_scene(True)
+        draw_scene(game_data["frame_rate"])
         pygame.display.update()
         check_game_end()
         check_level_end()
