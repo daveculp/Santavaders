@@ -1,10 +1,10 @@
 dwculp,5825
 dwculp,5060
 dwculp,4285
+dwculp,3720
 dwculp,3540
 dwculp,3060
 dwculp,2890
+dwculp,2725
 Grinch,2500
-dwculp,2095
-dwculp,2080
-dwculp,2050
+dwculp,2365
