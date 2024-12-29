@@ -37,9 +37,12 @@ def play_sound(sound, x_pos):
         channel.set_volume(left, right)
 
 def scale_image_by(image, scale_factor_x, scale_factor_y):
+    print("O:", image.get_height(), image.get_width())
     height = image.get_height() * scale_factor_y
     width = image.get_width() * scale_factor_x
+    print (width, height)
     return pygame.transform.scale(image, (width, height))
+
 def display_pause_screen():
     """Render the pause screen and wait for user input."""
     global game_state
@@ -94,64 +97,11 @@ def display_title_screen():
             game_data["game_state"] = GAME_STATE_QUIT
 
 def reset_game():
-    global santa_heads, present_list, santa_heads_pos, snowflakes, fireplaces
-    global star_rect,game_data, current_player_image, current_player_mask
-    global santa_image, santa_width, santa_height, player_rect
     
+    global game_data
     print("Resetting game!!")
     # Reset the game data dictionary back to original
     game_data = dict(default_game_data)
-  
-    
-   
-   
-    #reset player and missile images
-    current_player_image = player_image_star
-    current_player_mask = pygame.mask.from_surface(player_image_star)
-    
-    player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
-    player_rect.y = SCREEN_HEIGHT - player_height
-    #star_rect = star_image.get_rect()
-
-    # Reset Santa sleigh time
-    game_data["sleigh_time"] = pygame.time.get_ticks()
-    
-    # Reset Santa heads
-    # Initialize santa_heads with dictionaries
-    santa_image_file = level_data[0]["image_file"]
-    santa_image = pygame.image.load(santa_image_file).convert_alpha()
-    santa_width, santa_height = santa_image.get_size()
-    santa_heads = [
-        [
-        {"active": True, 
-        "rect": santa_image.get_rect(),
-        "exploding":False,
-        "explode_frame": 0,
-        "explode_time": 0} for _ in range(11)]
-        for _ in range(5)
-    ]
-    santa_heads_pos = [santa_x, 150]
-    
-    # Reset active presents
-    present_list = []
-    # Reset active fireplaces
-    fireplaces = []
-    
-    for i in range (4):
-        x = (gap_width * (i + 1)) + (fireplace_width * i)
-        fireplace = {
-            "active": True,
-            "x": x,
-            "y": fireplace_y,
-            "num_hit": 0,
-            "rect": fireplace_image.get_rect(),
-            "surface": fireplace_image.copy(),
-            "mask": pygame.mask.from_surface(fireplace_image),
-        }
-        fireplaces.append( fireplace )
-    fireplaces_active = True
-    # Reset snowflakes
-
     start_next_level()
 
 # ***********************************************************************
@@ -234,17 +184,14 @@ def game_over():
                 pygame.quit()
                 sys.exit()
     # After 4 seconds, proceed to standard game over screen
-    # Initialize snowflake properties
-    snowflakes = [{"x": random.randint(0, SCREEN_WIDTH), "y": random.randint(0, SCREEN_HEIGHT),
-                   "size": random.randint(1, 3), "speed": random.uniform(1, 3)}
-                  for _ in range(100)]  # Number of snowflakes
+
 
     # Wait for user input
     waiting = True
     while waiting:
         screen.fill((0, 0, 0))  # Clear the screen
         for snowflake in snowflakes:
-            snowflake["y"] += snowflake["speed"]
+            snowflake["y"] += snowflake["speed"]*SCALE_FACTOR
             if snowflake["y"] > SCREEN_HEIGHT:
                 snowflake["y"] = 0
                 snowflake["x"] = random.randint(0, SCREEN_WIDTH)
@@ -277,6 +224,7 @@ def game_over():
                     reset_game()
                     game_data["game_state"] = GAME_STATE_TITLE
                     pygame.time.wait(1000)
+        clock.tick(60)
 
 
 
@@ -370,8 +318,8 @@ def draw_scene(fps=False):
     shadow_text = scale_image_by(shadow_text, .75, .75)
     # Calculate text width and positions
     text_width = score_text.get_width()
-    x_position = SCREEN_WIDTH - text_width - 20
-    y_position = 50
+    x_position = SCREEN_WIDTH - text_width - (20*SCALE_FACTOR)
+    y_position = 50 * SCALE_FACTOR
     
     # Draw shadow slightly offset
     screen.blit(shadow_text, (x_position + 5, y_position + 5))
@@ -412,14 +360,14 @@ def update():
 
     #if santas sleigh is not active, check if it appears
     if not game_data["santa_sleigh_active"]:
-        if pygame.time.get_ticks() - game_data["sleigh_time"] > 10000:
+        if pygame.time.get_ticks() - game_data["sleigh_time"] > 11000:
             if random.randint(0,100) < 2:
                 game_data["santa_sleigh_active"] = True
                 santa_sleigh_rect.x  = 0
-                santa_sleigh_rect.y = 20
+                santa_sleigh_rect.y = 20*SCALE_FACTOR
                 play_sound(santa_sleigh_sound,SCREEN_WIDTH/2)
     else: #if santa sleigh is on the screen, update it and check bounds
-        santa_sleigh_rect.x += level_data[current_level]["santa_sleigh_speed"]
+        santa_sleigh_rect.x += level_data[current_level]["santa_sleigh_speed"]*SCALE_FACTOR
         if santa_sleigh_rect.x > SCREEN_WIDTH:
             game_data["santa_sleigh_active"] = False
             santa_sleigh_sound.stop()
@@ -430,9 +378,10 @@ def update():
         # Calculate the horizontal distance between the missile and the player
         distance_x = player_rect.centerx - bag_rect.centerx
         # Calculate the scaled speed
-        speed_x = distance_x * .1
+        speed_x = distance_x * .1*SCALE_FACTOR
         # Ensure the speed does not exceed the maximum allowed speed
-        speed_x = max(-15, min(15, speed_x))
+        max_speed = 15 * SCALE_FACTOR
+        speed_x = max(-max_speed, min(max_speed, speed_x))
         bag_rect.y += game_data["guided_bag_speed"]
         bag_rect.x += speed_x
         if bag_rect.y > SCREEN_HEIGHT:
@@ -440,14 +389,14 @@ def update():
             
     #spawn a guided bag if necessary
     if game_data["santa_sleigh_active"] and not game_data["guided_bag_active"]:
-        if random.randint(0,500) < 2:
+        if random.randint(0,500) < 1:
             bag_rect.x = santa_sleigh_rect.x
             bag_rect.y = santa_sleigh_rect.y
             game_data["guided_bag_active"] = True
     
     #update player star missile
     if game_data["star_active"]:
-        star_rect.y -= game_data["star_speed"]
+        star_rect.y -= game_data["star_speed"]*SCALE_FACTOR
         if star_rect.y <= 0:
             game_data["star_active"] = False
             current_player_image = player_image_star
@@ -456,7 +405,7 @@ def update():
     #update presents 
     present_list = [present for present in present_list if present.y <= SCREEN_HEIGHT]
     for present in present_list:
-        present.y += level_data[current_level]["present_speed"]
+        present.y += level_data[current_level]["present_speed"]*SCALE_FACTOR
 
     #update the explosions in the explosion list
     for i in range(len(explosion_list) - 1, -1, -1):  # iterate in reverse using index
@@ -500,16 +449,16 @@ def update():
 
     if reverse_direction:
         game_data["santa_heads_dir"] *= -1  # Reverse direction
-        santa_heads_pos[1] += 25  # Move Santa heads down
+        santa_heads_pos[1] += 25*SCALE_FACTOR  # Move Santa heads down
         
     #move the santa head position of the structure
     speed_add = game_data["santa_heads_speed_add"]
     current_speed = level_data[current_level]["santa_heads_speed"]
-    santa_heads_pos[0] += (current_speed+speed_add) * game_data["santa_heads_dir"]
+    santa_heads_pos[0] += (current_speed+speed_add) * game_data["santa_heads_dir"]*SCALE_FACTOR
         
     # Update snowflakes
     for snowflake in snowflakes:
-        snowflake["y"] += snowflake["speed"]  # Move snowflake down
+        snowflake["y"] += snowflake["speed"]*SCALE_FACTOR  # Move snowflake down
         if snowflake["y"] > SCREEN_HEIGHT:  # If it goes off-screen
             snowflake["y"] = 0  # Reset to the top
             snowflake["x"] = random.randint(0, SCREEN_WIDTH)  # Random x position
@@ -848,6 +797,8 @@ def start_next_level():
     #reset player images
     current_player_image = player_image_star
     current_player_mask = pygame.mask.from_surface(player_image_star)
+    player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
+    player_rect.y = SCREEN_HEIGHT - player_height
     star_rect = star_image.get_rect()
     
     # Reset Santa sleigh
@@ -872,6 +823,7 @@ def start_next_level():
     #load the levels ebnemy image
     santa_image_file = level_data[image_num]["image_file"]
     santa_image = pygame.image.load(santa_image_file).convert_alpha()
+    santa_image = scale_image_by(santa_image, SCALE_FACTOR, SCALE_FACTOR)
     santa_width, santa_height = santa_image.get_size()
 
     #reset the postion of the upper left of the enemty formation
@@ -897,15 +849,6 @@ def start_next_level():
         fireplaces.append( fireplace )
 
     game_data["fireplaces_active"] = True
-    # Reset snowflakes
-    snowflakes = []
-    for _ in range(200):
-        snowflakes.append({
-            "x": random.randint(0, SCREEN_WIDTH),
-            "y": random.randint(0, SCREEN_HEIGHT),
-            "size": random.randint(2, 5),
-            "speed": random.uniform(1, 3),
-        })
         
     game_data["guided_bag_active"] = False
     play_next_song()
@@ -916,7 +859,6 @@ def start_next_level():
 #*                       PYGAME INIT and setup                         *
 #***********************************************************************
 resolutions = [
-    (1152, 864, 0.5625),
     (1400, 1050,0.6836),
     (1600, 1200,0.78125),
     (1920, 1440,0.9375),
@@ -932,7 +874,10 @@ max_resolution = (0, 0)
 for width, height, scale in resolutions:
     if width <= screen_width and height <= screen_height:
         max_resolution = (width, height, scale)
+
+#max_resolution = (1400, 1050,0.6836)
 print("Best resolution for this screen:", max_resolution)
+
 LEFT = -1
 RIGHT = 1
 
@@ -946,178 +891,6 @@ SCALE_FACTOR = max_resolution[2]
 screen = pygame.display.set_mode( (SCREEN_WIDTH, SCREEN_HEIGHT) )
 pygame.display.set_caption("Santavaders")
 pygame.key.set_repeat()
-
-#***********************************************************************
-#*                     SOUNDS AND MUSIC                                *
-#***********************************************************************
-pygame.mixer.init()
-
-santa_sleigh_sound = pygame.mixer.Sound("media/sounds/santa-claus-laughing.ogg")
-santa_sleigh_sound.set_volume(1)
-
-player_shoot_sound = pygame.mixer.Sound("media/sounds/bell_shake.ogg")
-player_shoot_sound.set_volume(1)
-
-santa_shoot_sound = pygame.mixer.Sound("media/sounds/santa_chuckle.ogg")
-santa_shoot_sound.set_volume(1)
-
-bang_sound = pygame.mixer.Sound("media/sounds/bangmedium.ogg")
-bang_sound.set_volume(1)
-
-
-
-song_list = glob.glob("./media/music/*.mp3")
-
-pygame.mixer.music.set_volume(0.25)
-pygame.mixer.set_num_channels(64)
-
-END_MUSIC_EVENT = pygame.USEREVENT + 0   
-os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (50,50)
-pygame.mixer.music.set_endevent(END_MUSIC_EVENT)
-
-
-#***********************************************************************
-#*                       FONT SETUP                                    *
-#***********************************************************************
-# Load a custom Christmas-themed font
-pygame.font.init()
-font_path = "media/fonts/MountainsofChristmas-Bold.ttf"  # Replace with the path to your font file
-font = pygame.font.Font(font_path, 100)  # Large font size for boldness
-
-
-#***********************************************************************
-#*                       TITLE IMAGES                                  *
-#***********************************************************************
-# Load the title screen image
-title_screen_image = pygame.image.load("media/graphics/title_screen_alt.png").convert_alpha()
-title_screen_image = pygame.transform.scale(title_screen_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
-
-
-#***********************************************************************
-#*                       PLAYER IMAGE AND SETUP                        *
-#***********************************************************************
-
-player_image_star = pygame.image.load("media/graphics/christmas_tree_star_small.png").convert_alpha()
-player_image_nostar = pygame.image.load("media/graphics/christmas_tree_no_star_small.png").convert_alpha()
-
-player_width, player_height = player_image_star.get_size()
-player_rect = player_image_nostar.get_rect() 
-
-current_player_mask = pygame.mask.from_surface(player_image_star)
-current_player_image = player_image_star
-
-#set inital postion and velocity
-player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
-player_rect.y = SCREEN_HEIGHT - player_height
-playerpos = [SCREEN_WIDTH// 2 - player_width // 2, SCREEN_HEIGHT - player_height]
-
-
-#***********************************************************************
-#*                       STAR/MISSILE SETUP                            *
-#***********************************************************************
-star_image = pygame.image.load("media/graphics/tree_star_small.png").convert_alpha()
-star_width, star_height = star_image.get_size()
-star_rect = star_image.get_rect()
-star_mask = pygame.mask.from_surface(star_image)
-
-#***********************************************************************
-#*                       SANTAS GUIDED MISSILE/BAG                     *
-#***********************************************************************
-bag_image = pygame.image.load("media/graphics/guided_bag_small.png").convert_alpha()
-bag_width, bag_height = bag_image.get_size()
-bag_rect = star_image.get_rect()
-sbag_mask = pygame.mask.from_surface(bag_image)
-
-#***********************************************************************
-#*                       SANTA HEADS SETUP                             *
-#***********************************************************************
-
-santa_image = pygame.image.load("media/graphics/santa_head_small2.png").convert_alpha()
-santa_width, santa_height = santa_image.get_size()
-
-# Initialize santa_heads with dictionaries
-santa_heads = [
-    [
-    {"active": True, 
-    "rect": santa_image.get_rect(),
-    "exploding":False,
-    "explode_frame": 0,
-    "explode_time": 0} for _ in range(11)]
-    for _ in range(5)
-]
-
-santa_x = (SCREEN_WIDTH - ( (santa_width * 11) + (santa_width//2 * 11) ) )/2
-santa_heads_pos = [santa_x, 130]
-
-#***********************************************************************
-#*                       SANTA SLEIGH                                  *
-#***********************************************************************
-santa_sleigh_image = pygame.image.load("media/graphics/santa_sleigh_small.png").convert_alpha()
-santa_sleigh_rect = santa_sleigh_image.get_rect()
-#sleigh_time = pygame.time.get_ticks()
-
-
-#***********************************************************************
-#*                       SNOWFLAKES                                    *
-#***********************************************************************
-
-snowflakes = []  # List to hold snowflake properties
-for _ in range(150):
-    snowflakes.append({
-        "x": random.randint(0, SCREEN_WIDTH),  # Random x position
-        "y": random.randint(0, SCREEN_HEIGHT),  # Random y position
-        "size": random.randint(2, 5),  # Random size
-        "speed": random.uniform(1, 3)  # Random fall speed
-    })
-
-#***********************************************************************
-#*                       FIREPLACE/SHIELDS SETUP                       *
-#***********************************************************************
-fireplace_image = pygame.image.load("media/graphics/fireplace_small.png").convert_alpha()
-fireplace_width, fireplace_height = fireplace_image.get_size()
-fireplace_width, fireplace_height = fireplace_image.get_size()
-fireplace_y = player_rect.y-fireplace_height-50 
-
-# Calculate the gap width
-total_gap_space = SCREEN_WIDTH - (4 * fireplace_width)
-gap_width = total_gap_space / (4 + 1)
-
-
-fireplaces = []
-for i in range (4):
-    x = (gap_width * (i + 1)) + (fireplace_width * i)
-    fireplace = {
-        "active": True,
-        "x": x,
-        "y": fireplace_y,
-        "num_hit": 0,
-        "rect": fireplace_image.get_rect(),
-        "surface": fireplace_image.copy(),
-        "mask": pygame.mask.from_surface(fireplace_image),
-    }
-    fireplaces.append( fireplace )
-#fireplaces_active = True
-
-
-#***********************************************************************
-#*                       PRESENT/ENEMY BULLETS SETUP                   *
-#***********************************************************************
-present_image = pygame.image.load("media/graphics/present_small.png").convert_alpha()
-present_mask = pygame.mask.from_surface(present_image)
-present_width, present_height = present_image.get_size()
-present_width, present_height = present_image.get_size()
-present_list = []
-
-#***********************************************************************
-#*                       EXPLOSION GRAPHICS                            *
-#***********************************************************************
-explosion_graphics =[]
-explosion_list = []
-for i in range(7):
-    filename = "media/graphics/explosion"+str(i+1)+".png"
-    explosion =  pygame.image.load(filename).convert_alpha()
-    explosion_graphics.append(explosion)
-
 #***********************************************************************
 #*                       GAME STATE INFO                               *
 #***********************************************************************
@@ -1224,6 +997,191 @@ default_game_data = {   "game_state": GAME_STATE_RUNNING,
 #values when resetting the game.
 game_data = dict(default_game_data)
                 
+
+#***********************************************************************
+#*                     SOUNDS AND MUSIC                                *
+#***********************************************************************
+pygame.mixer.init()
+
+santa_sleigh_sound = pygame.mixer.Sound("media/sounds/santa-claus-laughing.ogg")
+santa_sleigh_sound.set_volume(1)
+
+player_shoot_sound = pygame.mixer.Sound("media/sounds/bell_shake.ogg")
+player_shoot_sound.set_volume(1)
+
+santa_shoot_sound = pygame.mixer.Sound("media/sounds/santa_chuckle.ogg")
+santa_shoot_sound.set_volume(1)
+
+bang_sound = pygame.mixer.Sound("media/sounds/bangmedium.ogg")
+bang_sound.set_volume(1)
+
+
+
+song_list = glob.glob("./media/music/*.mp3")
+
+pygame.mixer.music.set_volume(0.1)
+pygame.mixer.set_num_channels(64)
+
+END_MUSIC_EVENT = pygame.USEREVENT + 0   
+os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (50,50)
+pygame.mixer.music.set_endevent(END_MUSIC_EVENT)
+
+
+#***********************************************************************
+#*                       FONT SETUP                                    *
+#***********************************************************************
+# Load a custom Christmas-themed font
+pygame.font.init()
+font_path = "media/fonts/MountainsofChristmas-Bold.ttf"  # Replace with the path to your font file
+font = pygame.font.Font(font_path, int(100*SCALE_FACTOR))  # Large font size for boldness
+
+
+#***********************************************************************
+#*                       TITLE IMAGES                                  *
+#***********************************************************************
+# Load the title screen image
+title_screen_image = pygame.image.load("media/graphics/title_screen_alt.png").convert_alpha()
+title_screen_image = pygame.transform.scale(title_screen_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+
+#***********************************************************************
+#*                       PLAYER IMAGE AND SETUP                        *
+#***********************************************************************
+
+player_image_star = pygame.image.load("media/graphics/christmas_tree_star_small.png").convert_alpha()
+player_image_star = scale_image_by(player_image_star, SCALE_FACTOR, SCALE_FACTOR)
+
+player_image_nostar = pygame.image.load("media/graphics/christmas_tree_no_star_small.png").convert_alpha()
+player_image_nostar = scale_image_by(player_image_nostar, SCALE_FACTOR, SCALE_FACTOR)
+
+player_width, player_height = player_image_star.get_size()
+player_rect = player_image_nostar.get_rect() 
+
+current_player_mask = pygame.mask.from_surface(player_image_star)
+current_player_image = player_image_star
+
+#set inital postion and velocity
+player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
+player_rect.y = SCREEN_HEIGHT - player_height
+playerpos = [SCREEN_WIDTH// 2 - player_width // 2, SCREEN_HEIGHT - player_height]
+
+
+#***********************************************************************
+#*                       STAR/MISSILE SETUP                            *
+#***********************************************************************
+star_image = pygame.image.load("media/graphics/tree_star_small.png").convert_alpha()
+star_image = scale_image_by(star_image, SCALE_FACTOR, SCALE_FACTOR)
+star_width, star_height = star_image.get_size()
+star_rect = star_image.get_rect()
+star_mask = pygame.mask.from_surface(star_image)
+
+#***********************************************************************
+#*                       SANTAS GUIDED MISSILE/BAG                     *
+#***********************************************************************
+bag_image = pygame.image.load("media/graphics/guided_bag_small.png").convert_alpha()
+bag_image = scale_image_by(bag_image, SCALE_FACTOR, SCALE_FACTOR)
+bag_width, bag_height = bag_image.get_size()
+bag_rect = star_image.get_rect()
+bag_mask = pygame.mask.from_surface(bag_image)
+
+#***********************************************************************
+#*                       SANTA HEADS SETUP                             *
+#***********************************************************************
+
+santa_image_file = level_data[0]["image_file"]
+santa_image = pygame.image.load(santa_image_file).convert_alpha()
+santa_image = scale_image_by(santa_image, SCALE_FACTOR, SCALE_FACTOR)
+santa_width, santa_height = santa_image.get_size()
+
+# Initialize santa_heads with dictionaries
+santa_heads = [
+    [
+    {"active": True, 
+    "rect": santa_image.get_rect(),
+    "exploding":False,
+    "explode_frame": 0,
+    "explode_time": 0} for _ in range(11)]
+    for _ in range(5)
+]
+
+santa_x = (SCREEN_WIDTH - ( (santa_width * 11*SCALE_FACTOR) + (santa_width//2 * 11*SCALE_FACTOR) ) )/2
+santa_x = 0
+santa_heads_pos = [santa_x, int(130*SCALE_FACTOR)]
+
+#***********************************************************************
+#*                       SANTA SLEIGH                                  *
+#***********************************************************************
+santa_sleigh_image = pygame.image.load("media/graphics/santa_sleigh_small.png").convert_alpha()
+santa_sleigh_image = scale_image_by(santa_sleigh_image, SCALE_FACTOR, SCALE_FACTOR)
+santa_sleigh_rect = santa_sleigh_image.get_rect()
+#sleigh_time = pygame.time.get_ticks()
+
+
+#***********************************************************************
+#*                       SNOWFLAKES                                    *
+#***********************************************************************
+
+snowflakes = []  # List to hold snowflake properties
+for _ in range(int(150*SCALE_FACTOR)):
+    snowflakes.append({
+        "x": random.randint(0, SCREEN_WIDTH),  # Random x position
+        "y": random.randint(0, SCREEN_HEIGHT),  # Random y position
+        "size": random.randint(2, 5),  # Random size
+        "speed": random.uniform(1, 3)  # Random fall speed
+    })
+
+#***********************************************************************
+#*                       FIREPLACE/SHIELDS SETUP                       *
+#***********************************************************************
+fireplace_image = pygame.image.load("media/graphics/fireplace_small.png").convert_alpha()
+fireplace_image = scale_image_by(fireplace_image, SCALE_FACTOR, SCALE_FACTOR)
+fireplace_width, fireplace_height = fireplace_image.get_size()
+fireplace_width, fireplace_height = fireplace_image.get_size()
+fireplace_y = player_rect.y-fireplace_height-(50*SCALE_FACTOR) 
+
+# Calculate the gap width
+total_gap_space = SCREEN_WIDTH - (4 * fireplace_width)
+gap_width = total_gap_space / (5*SCALE_FACTOR)
+
+
+fireplaces = []
+for i in range (4):
+    x = (gap_width * (i + 1)) + (fireplace_width * i)
+    fireplace = {
+        "active": True,
+        "x": x,
+        "y": fireplace_y,
+        "num_hit": 0,
+        "rect": fireplace_image.get_rect(),
+        "surface": fireplace_image.copy(),
+        "mask": pygame.mask.from_surface(fireplace_image),
+    }
+    fireplaces.append( fireplace )
+#fireplaces_active = True
+
+
+#***********************************************************************
+#*                       PRESENT/ENEMY BULLETS SETUP                   *
+#***********************************************************************
+present_image = pygame.image.load("media/graphics/present_small.png").convert_alpha()
+present_image = scale_image_by(present_image, SCALE_FACTOR, SCALE_FACTOR)
+present_mask = pygame.mask.from_surface(present_image)
+present_width, present_height = present_image.get_size()
+present_width, present_height = present_image.get_size()
+present_list = []
+
+#***********************************************************************
+#*                       EXPLOSION GRAPHICS                            *
+#***********************************************************************
+explosion_graphics =[]
+explosion_list = []
+for i in range(7):
+    filename = "media/graphics/explosion"+str(i+1)+".png"
+    explosion =  pygame.image.load(filename).convert_alpha()
+    explosion = scale_image_by(explosion, SCALE_FACTOR, SCALE_FACTOR)
+    explosion_graphics.append(explosion)
+
+
                 
                 
                 
