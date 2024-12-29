@@ -37,11 +37,14 @@ def play_sound(sound, x_pos):
         channel.set_volume(left, right)
 
 def scale_image_by(image, scale_factor_x, scale_factor_y):
-    print("O:", image.get_height(), image.get_width())
     height = image.get_height() * scale_factor_y
     width = image.get_width() * scale_factor_x
-    print (width, height)
     return pygame.transform.scale(image, (width, height))
+    
+def load_image(filename, scale_factor_x, scale_factor_y):
+    image = pygame.image.load(filename).convert_alpha()
+    return scale_image_by(image, scale_factor_x, scale_factor_y)
+    
 
 def display_pause_screen():
     """Render the pause screen and wait for user input."""
@@ -78,7 +81,7 @@ def display_pause_screen():
 
 def display_title_screen():
     global game_state
-    #pygame.mixer.music.stop()
+    #pygame.mixer.music.play(0)
     screen.blit(title_screen_image, (0, 0))
     pygame.display.flip()
     waiting = True
@@ -92,17 +95,19 @@ def display_title_screen():
         if keys[pygame.K_SPACE]:
             waiting = False  # Exit the loop and start the game
             game_data["game_state"] = GAME_STATE_RUNNING
+            reset_game(True)
         if keys[pygame.K_ESCAPE]:
             waiting = False
             game_data["game_state"] = GAME_STATE_QUIT
 
-def reset_game():
+def reset_game(load_next_level):
     
     global game_data
     print("Resetting game!!")
     # Reset the game data dictionary back to original
     game_data = dict(default_game_data)
-    start_next_level()
+    if load_next_level:
+        start_next_level()
 
 # ***********************************************************************
 # *                       HIGH SCORES MANAGEMENT                       *
@@ -137,7 +142,7 @@ def update_high_scores(player_name, player_score, high_scores):
 
 def display_high_scores(high_scores, player_name=None, player_score=None):
     """Display the high scores on the game over screen."""
-    y_start = SCREEN_HEIGHT // 14  # Starting y-coordinate
+    y_start = SCREEN_HEIGHT // 14+50*(SCALE_FACTOR)  # Starting y-coordinate
       # Get height of the font and add padding
 
     for i, (name, score) in enumerate(high_scores):
@@ -188,6 +193,7 @@ def game_over():
 
     # Wait for user input
     waiting = True
+    
     while waiting:
         screen.fill((0, 0, 0))  # Clear the screen
         for snowflake in snowflakes:
@@ -221,15 +227,15 @@ def game_over():
                     waiting = False
                 if event.key == pygame.K_SPACE:
                     waiting = False
-                    reset_game()
+                    #reset_game(False)
                     game_data["game_state"] = GAME_STATE_TITLE
-                    pygame.time.wait(1000)
+                    pygame.time.wait(500)
         clock.tick(60)
 
 
 
-def draw_scene(fps=False):
-    global santa_heads, star_rect, santa_sleigh_rect, bag_rect
+def draw_scene():
+    global invaders, star_rect, santa_sleigh_rect, bag_rect
     global player_rect, present_list, fireplaces, game_data 
     # Fill the background with black
     screen.fill((0, 0, 0))
@@ -256,26 +262,26 @@ def draw_scene(fps=False):
     #draw the santa heads
     for row in range(5):
         for col in range(11):
-            if santa_heads[row][col]["active"]:
-                x = santa_heads_pos[0] + (col*santa_width) + (santa_width//2)*col 
-                y = santa_heads_pos[1] + (row*santa_height ) + (santa_height//2) * row
-                santa_heads[row][col]["rect"] = screen.blit(santa_image, [x, y] )
+            if invaders[row][col]["active"]:
+                x = invaders_pos[0] + (col*invader_width) + (invader_width//2)*col 
+                y = invaders_pos[1] + (row*invader_height ) + (invader_height//2) * row
+                invaders[row][col]["rect"] = screen.blit(invader_image, [x, y] )
 
     #draw the santa heads exploding 
     for row in range(5):
         for col in range(11):
-            if santa_heads[row][col]["exploding"]:
-                if time.time() - santa_heads[row][col]["explode_time"]< EXPLOSION_FRAME_DURATION:
+            if invaders[row][col]["exploding"]:
+                if time.time() - invaders[row][col]["explode_time"]< EXPLOSION_FRAME_DURATION:
                     break
-                frame = santa_heads[row][col]["explode_frame"]
-                x_pos = santa_heads_pos[0] + (col*santa_width) + (santa_width//2)*col 
-                y_pos = santa_heads_pos[1] + (row*santa_height ) + (santa_height//2) * row
-                santa_heads[row][col]["rect"] = screen.blit(explosion_graphics[frame], [x_pos, y_pos] )
+                frame = invaders[row][col]["explode_frame"]
+                x_pos = invaders_pos[0] + (col*invader_width) + (invader_width//2)*col 
+                y_pos = invaders_pos[1] + (row*invader_height ) + (invader_height//2) * row
+                invaders[row][col]["rect"] = screen.blit(explosion_graphics[frame], [x_pos, y_pos] )
                 frame = frame + 1
                 if frame == len(explosion_graphics):
-                    santa_heads[row][col]["exploding"] = False
-                santa_heads[row][col]["explode_frame"] = frame
-                santa_heads[row][col]["explode_time"] = time.time()
+                    invaders[row][col]["exploding"] = False
+                invaders[row][col]["explode_frame"] = frame
+                invaders[row][col]["explode_time"] = time.time()
              
     #draw presents if there are active presents in the list
     if present_list:
@@ -344,7 +350,7 @@ def draw_scene(fps=False):
     # Draw the main text
     screen.blit(level_text, (x_position, y_position))
     #draw FPSscreen.blit(playerimage, playerpos)
-    if fps:
+    if game_data["show_fps"]:
         fps = str(int(clock.get_fps()))
         fps_text = font.render(fps, 1, pygame.Color("coral"))
         screen.blit(fps_text, (10,SCREEN_HEIGHT-fps_text.get_height()))
@@ -354,7 +360,7 @@ def draw_scene(fps=False):
 def update():
     global star_rect, current_player_image, santa_sleigh_rect, snowflakes
     global present_list, santa_sleigh_sound, game_data, explosion_list
-    global current_player_mask
+    global current_player_mask, invaders
    
     current_level = game_data["current_level"]
 
@@ -423,12 +429,11 @@ def update():
             fireplace["active"] = False
             
     # Generate a random Santa present shot
-    active_santas = [(row, col) for row in range(5) for col in range(11) if santa_heads[row][col]["active"]]
-    if active_santas and random.randint(0, 101) < level_data[current_level]["santa_shot_chance"]:
-        row, col = random.choice(active_santas)
-        
-        x = santa_heads[row][col]["rect"].centerx
-        y = santa_heads[row][col]["rect"].centery
+    active_invaders = [(row, col) for row in range(5) for col in range(11) if invaders[row][col]["active"]]
+    if active_invaders and random.randint(0, 101) < level_data[current_level]["santa_shot_chance"]:
+        row, col = random.choice(active_invaders)
+        x = invaders[row][col]["rect"].centerx
+        y = invaders[row][col]["rect"].centery
         width = present_image.get_width()
         height = present_image.get_height()
         rect = pygame.Rect(x, y, width, height)
@@ -437,24 +442,24 @@ def update():
     
     # Check Santa head movement limits and reverse direction if necessary
     reverse_direction = False
-    for row in range(len(santa_heads)):
-        for col in range(len(santa_heads[row])):
-            if santa_heads[row][col]["active"]:  # Check if Santa head is active
-                santa_rect = santa_heads[row][col]["rect"] #get the rectangle at that position
-                if santa_rect.x <= 0 or santa_rect.x + santa_width >= SCREEN_WIDTH:
+    for row in range(len(invaders)):
+        for col in range(len(invaders[row])):
+            if invaders[row][col]["active"]:  # Check if Santa head is active
+                invader_rect = invaders[row][col]["rect"] #get the rectangle at that position
+                if invader_rect.x <= 0 or invader_rect.x + invader_width >= SCREEN_WIDTH:
                     reverse_direction = True
                     break
         if reverse_direction:
             break
 
     if reverse_direction:
-        game_data["santa_heads_dir"] *= -1  # Reverse direction
-        santa_heads_pos[1] += 25*SCALE_FACTOR  # Move Santa heads down
+        game_data["invaders_dir"] *= -1  # Reverse direction
+        invaders_pos[1] += 25*SCALE_FACTOR  # Move Santa heads down
         
     #move the santa head position of the structure
-    speed_add = game_data["santa_heads_speed_add"]
-    current_speed = level_data[current_level]["santa_heads_speed"]
-    santa_heads_pos[0] += (current_speed+speed_add) * game_data["santa_heads_dir"]*SCALE_FACTOR
+    speed_add = game_data["invader_speed_add"]
+    current_speed = level_data[current_level]["invader_speed"]
+    invaders_pos[0] += (current_speed+speed_add) * game_data["invaders_dir"]*SCALE_FACTOR
         
     # Update snowflakes
     for snowflake in snowflakes:
@@ -468,10 +473,10 @@ def update():
     # Check for lowest alien reaching fireplace or player Y-coordinate
     for row in range(4, -1, -1):  # Iterate rows in reverse (4 to 0)
         for col in range(11):
-            if santa_heads[row][col]["active"]:  # Check if the alien is active
-                alien_x = santa_heads_pos[0] + (col * santa_width) + (santa_width // 2) * col
-                alien_y = santa_heads_pos[1] + (row * santa_height) + (santa_height // 2) * row
-                alien_bottom = alien_y + santa_height
+            if invaders[row][col]["active"]:  # Check if the alien is active
+                alien_x = invaders_pos[0] + (col * invader_width) + (invader_width // 2) * col
+                alien_y = invaders_pos[1] + (row * invader_height) + (invader_height // 2) * row
+                alien_bottom = alien_y + invader_height
 
                 if alien_bottom >= playerpos[1]:  # Game Over Condition
                     print("GAME OVER!!!")
@@ -546,15 +551,15 @@ def detect_collisions():
     if game_data["star_active"]:
         for row in range(5):
             for col in range(11):
-                if santa_heads[row][col]["active"]: #is there an active santa head here
-                    santa_rect = santa_heads[row][col]["rect"]
-                    if santa_rect.colliderect(star_rect):
-                        game_data["santa_heads_speed_add"] += .1
-                        play_sound(bang_sound, santa_rect.x)
-                        santa_heads[row][col]["active"] = False
-                        santa_heads[row][col]["exploding"] = True
-                        santa_heads[row][col]["explode_frame"] = 0
-                        santa_heads[row][col]["explode_time"] = time.time()
+                if invaders[row][col]["active"]: #is there an active santa head here
+                    invader_rect = invaders[row][col]["rect"]
+                    if invader_rect.colliderect(star_rect):
+                        game_data["invader_speed_add"] += .1
+                        play_sound(bang_sound, invader_rect.x)
+                        invaders[row][col]["active"] = False
+                        invaders[row][col]["exploding"] = True
+                        invaders[row][col]["explode_frame"] = 0
+                        invaders[row][col]["explode_time"] = time.time()
                         game_data["star_active"] = False
                         current_player_image = player_image_star
                         current_player_mask = pygame.mask.from_surface(player_image_star)
@@ -765,24 +770,24 @@ def check_game_end():
 def check_level_end():
     global current_level
     # Check if there are any active Santas
-    has_active_santas = any(santa["active"] for row in santa_heads for santa in row)
+    has_active_invaders = any(invader["active"] for row in invaders for invader in row)
     
-    if not has_active_santas and game_data["santa_sleigh_active"]:
+    if not has_active_invaders:
         # Trigger level completion or game state change
         pygame.time.wait(3000);
         start_next_level()
 
 def start_next_level():
-    global  current_player_image, current_player_mask, star_rect,  santa_heads
-    global santa_heads_pos, present_list, fireplaces, snowflakes
-    global game_data, santa_image, santa_width, santa_height
+    global  current_player_image, current_player_mask, star_rect, invaders
+    global invaders_pos, present_list, fireplaces, snowflakes
+    global game_data, invader_image, invader_width, invader_height
      
     
     #assume we have not completed all levels and we will not load a
     #random enemy image
     random_image = False
     current_level = game_data["current_level"]
-    game_data["santa_heads_speed_add"] = 0
+    game_data["invader_speed_add"] = 0
 
     #check if we have completed all known levels.  If so, load a random
     #enemy and use the last level data 
@@ -807,10 +812,10 @@ def start_next_level():
     
     # Reset Santa heads
     # Initialize santa_heads with dictionaries
-    santa_heads = [
+    invaders = [
         [
         {"active": True, 
-        "rect": santa_image.get_rect(),
+        "rect": invader_image.get_rect(),
         "exploding":False,
         "explode_frame": 0,
         "explode_time": 0} for _ in range(11)]
@@ -821,14 +826,14 @@ def start_next_level():
     else:
         image_num = current_level
     #load the levels ebnemy image
-    santa_image_file = level_data[image_num]["image_file"]
-    santa_image = pygame.image.load(santa_image_file).convert_alpha()
-    santa_image = scale_image_by(santa_image, SCALE_FACTOR, SCALE_FACTOR)
-    santa_width, santa_height = santa_image.get_size()
+    invader_image_file = level_data[image_num]["image_file"]
+    invader_image = pygame.image.load(invader_image_file).convert_alpha()
+    invader_image = scale_image_by(invader_image, SCALE_FACTOR, SCALE_FACTOR)
+    invader_width, invader_height = invader_image.get_size()
 
     #reset the postion of the upper left of the enemty formation
-    santa_heads_pos = [santa_x, 150+(game_data["current_level"]*20)]
-    game_data["santa_heads_dir"] = LEFT
+    invaders_pos = [invader_x, 130+(game_data["current_level"]*20)*SCALE_FACTOR]
+    game_data["invaders_dir"] = LEFT
     
     # Reset presents
     present_list = []
@@ -870,27 +875,23 @@ pygame.init()
 info = pygame.display.Info()  # Get current display info
 screen_width = info.current_w
 screen_height = info.current_h
-max_resolution = (0, 0)
+max_resolution = (0, 0,0)
 for width, height, scale in resolutions:
     if width <= screen_width and height <= screen_height:
         max_resolution = (width, height, scale)
 
-#max_resolution = (1400, 1050,0.6836)
+#max_resolution = (1600, 1200,0.78125)
 print("Best resolution for this screen:", max_resolution)
-
 LEFT = -1
 RIGHT = 1
-
-#SCREEN_WIDTH = 1152
-#SCREEN_HEIGHT = 864
 
 SCREEN_WIDTH = max_resolution[0]
 SCREEN_HEIGHT = max_resolution[1]
 SCALE_FACTOR = max_resolution[2]
+
 # Set up the drawing window
 screen = pygame.display.set_mode( (SCREEN_WIDTH, SCREEN_HEIGHT) )
 pygame.display.set_caption("Santavaders")
-pygame.key.set_repeat()
 #***********************************************************************
 #*                       GAME STATE INFO                               *
 #***********************************************************************
@@ -905,16 +906,14 @@ GAME_STATE_GAME_OVER = 5
 GAME_STATE_LEVEL_OVER = 6
 EXPLOSION_FRAME_DURATION = 0.03
 
-game_state = GAME_STATE_TITLE #set initial game state
-# Run until the user asks to quit
-running = True
+
 
 #***********************************************************************
-#*                       levl info                                     *
+#*                       level info                                     *
 #***********************************************************************
 
 level_data = [ { "image_file": "media/graphics/santa_saucer_smalll.png",
-                "santa_heads_speed": 2,
+                "invader_speed": 2,
                 "santa_sleigh_speed": 2,
                 "santa_sleigh_points": 300,
                 "santa_head_points": 10,
@@ -924,7 +923,7 @@ level_data = [ { "image_file": "media/graphics/santa_saucer_smalll.png",
                 },
                 
 { "image_file": "media/graphics/evil_gingerbreadman_small.png",
-                "santa_heads_speed": 3,
+                "invader_speed": 3,
                 "santa_sleigh_speed": 3,
                 "santa_sleigh_points": 400,
                 "santa_head_points": 15,
@@ -934,7 +933,7 @@ level_data = [ { "image_file": "media/graphics/santa_saucer_smalll.png",
                 },
                 
 { "image_file": "media/graphics/evil_candy_cane_small.png",
-                "santa_heads_speed": 4,
+                "invader_speed": 4,
                 "santa_sleigh_speed": 4,
                 "santa_sleigh_points": 400,
                 "santa_head_points": 15,
@@ -944,7 +943,7 @@ level_data = [ { "image_file": "media/graphics/santa_saucer_smalll.png",
                 },
                 
 { "image_file": "media/graphics/robotic_reindeer_small.png",
-                "santa_heads_speed": 6,
+                "invader_speed": 6,
                 "santa_sleigh_speed": 5,
                 "santa_sleigh_points": 500,
                 "santa_head_points": 20,
@@ -954,7 +953,7 @@ level_data = [ { "image_file": "media/graphics/santa_saucer_smalll.png",
                 },
                 
 { "image_file": "media/graphics/evil_snowman_small.png",
-                "santa_heads_speed": 8,
+                "invader_speed": 8,
                 "santa_sleigh_speed": 6,
                 "santa_sleigh_points": 600,
                 "santa_head_points": 25,
@@ -964,43 +963,40 @@ level_data = [ { "image_file": "media/graphics/santa_saucer_smalll.png",
                 }
                 ]
                 
-                               
-                
-                
-                
- 
 #***********************************************************************
 #*                       General game info                             *
 #***********************************************************************
 
 #this keeps default game congig data
-default_game_data = {   "game_state": GAME_STATE_RUNNING,
+default_game_data = {   
+                "game_state": GAME_STATE_RUNNING,
                 "running": True,
                 "player_score":0,
                 "high_score":0,
-                "current_level":-1,
+                "current_level":-1, 
                 "game_sound_state": True,
                 "is_game_over": False,
                 "fireplaces_active": True,
                 "sleigh_time": 0,
                 "santa_sleigh_active": False,       
-                "santa_heads_dir": LEFT,
+                "invaders_dir": LEFT,
                 "star_active": False,
                 "star_speed": 15,
                 "guided_bag_active": False,
                 "guided_bag_speed": 8,
-                "frame_rate": True,
-                "santa_heads_speed_add": 0,
+                "show_fps": False,
+                "invader_speed_add": 0,
                 "player_speed": 8
 }
 #we will operate on a copy of this dict and simply recopy the default 
 #values when resetting the game.
 game_data = dict(default_game_data)
-                
+game_data["game_state"] = GAME_STATE_TITLE #set initial game state
 
 #***********************************************************************
 #*                     SOUNDS AND MUSIC                                *
 #***********************************************************************
+pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 
 santa_sleigh_sound = pygame.mixer.Sound("media/sounds/santa-claus-laughing.ogg")
@@ -1015,11 +1011,9 @@ santa_shoot_sound.set_volume(1)
 bang_sound = pygame.mixer.Sound("media/sounds/bangmedium.ogg")
 bang_sound.set_volume(1)
 
-
-
 song_list = glob.glob("./media/music/*.mp3")
 
-pygame.mixer.music.set_volume(0.1)
+pygame.mixer.music.set_volume(0.55)
 pygame.mixer.set_num_channels(64)
 
 END_MUSIC_EVENT = pygame.USEREVENT + 0   
@@ -1035,7 +1029,6 @@ pygame.font.init()
 font_path = "media/fonts/MountainsofChristmas-Bold.ttf"  # Replace with the path to your font file
 font = pygame.font.Font(font_path, int(100*SCALE_FACTOR))  # Large font size for boldness
 
-
 #***********************************************************************
 #*                       TITLE IMAGES                                  *
 #***********************************************************************
@@ -1048,29 +1041,25 @@ title_screen_image = pygame.transform.scale(title_screen_image, (SCREEN_WIDTH, S
 #*                       PLAYER IMAGE AND SETUP                        *
 #***********************************************************************
 
-player_image_star = pygame.image.load("media/graphics/christmas_tree_star_small.png").convert_alpha()
-player_image_star = scale_image_by(player_image_star, SCALE_FACTOR, SCALE_FACTOR)
-
-player_image_nostar = pygame.image.load("media/graphics/christmas_tree_no_star_small.png").convert_alpha()
-player_image_nostar = scale_image_by(player_image_nostar, SCALE_FACTOR, SCALE_FACTOR)
-
+player_image_star = load_image("media/graphics/christmas_tree_star_small.png", SCALE_FACTOR, SCALE_FACTOR)
+player_image_nostar = load_image("media/graphics/christmas_tree_no_star_small.png", SCALE_FACTOR, SCALE_FACTOR)
 player_width, player_height = player_image_star.get_size()
-player_rect = player_image_nostar.get_rect() 
 
+player_rect = player_image_nostar.get_rect() 
 current_player_mask = pygame.mask.from_surface(player_image_star)
 current_player_image = player_image_star
 
 #set inital postion and velocity
 player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
 player_rect.y = SCREEN_HEIGHT - player_height
-playerpos = [SCREEN_WIDTH// 2 - player_width // 2, SCREEN_HEIGHT - player_height]
+playerpos = [player_rect.x, player_rect.y]
 
 
 #***********************************************************************
 #*                       STAR/MISSILE SETUP                            *
 #***********************************************************************
-star_image = pygame.image.load("media/graphics/tree_star_small.png").convert_alpha()
-star_image = scale_image_by(star_image, SCALE_FACTOR, SCALE_FACTOR)
+
+star_image = load_image("media/graphics/tree_star_small.png", SCALE_FACTOR, SCALE_FACTOR)
 star_width, star_height = star_image.get_size()
 star_rect = star_image.get_rect()
 star_mask = pygame.mask.from_surface(star_image)
@@ -1078,8 +1067,7 @@ star_mask = pygame.mask.from_surface(star_image)
 #***********************************************************************
 #*                       SANTAS GUIDED MISSILE/BAG                     *
 #***********************************************************************
-bag_image = pygame.image.load("media/graphics/guided_bag_small.png").convert_alpha()
-bag_image = scale_image_by(bag_image, SCALE_FACTOR, SCALE_FACTOR)
+bag_image = load_image("media/graphics/guided_bag_small.png", SCALE_FACTOR, SCALE_FACTOR)
 bag_width, bag_height = bag_image.get_size()
 bag_rect = star_image.get_rect()
 bag_mask = pygame.mask.from_surface(bag_image)
@@ -1088,41 +1076,37 @@ bag_mask = pygame.mask.from_surface(bag_image)
 #*                       SANTA HEADS SETUP                             *
 #***********************************************************************
 
-santa_image_file = level_data[0]["image_file"]
-santa_image = pygame.image.load(santa_image_file).convert_alpha()
-santa_image = scale_image_by(santa_image, SCALE_FACTOR, SCALE_FACTOR)
-santa_width, santa_height = santa_image.get_size()
+invader_image_file = level_data[0]["image_file"]
+invader_image = load_image(invader_image_file, SCALE_FACTOR, SCALE_FACTOR)
+invader_width, invader_height = invader_image.get_size()
 
 # Initialize santa_heads with dictionaries
-santa_heads = [
+invaders = [
     [
     {"active": True, 
-    "rect": santa_image.get_rect(),
+    "rect": invader_image.get_rect(),
     "exploding":False,
     "explode_frame": 0,
     "explode_time": 0} for _ in range(11)]
     for _ in range(5)
 ]
 
-santa_x = (SCREEN_WIDTH - ( (santa_width * 11*SCALE_FACTOR) + (santa_width//2 * 11*SCALE_FACTOR) ) )/2
-santa_x = 0
-santa_heads_pos = [santa_x, int(130*SCALE_FACTOR)]
+invader_x = (SCREEN_WIDTH - ( (invader_width * 11*SCALE_FACTOR) + (invader_width//2 * 11*SCALE_FACTOR) ) )/2
+invader_x = 0
+invaders_pos = [invader_x, int(150*SCALE_FACTOR)]
 
 #***********************************************************************
 #*                       SANTA SLEIGH                                  *
 #***********************************************************************
-santa_sleigh_image = pygame.image.load("media/graphics/santa_sleigh_small.png").convert_alpha()
-santa_sleigh_image = scale_image_by(santa_sleigh_image, SCALE_FACTOR, SCALE_FACTOR)
+santa_sleigh_image = load_image("media/graphics/santa_sleigh_small.png", SCALE_FACTOR, SCALE_FACTOR)
 santa_sleigh_rect = santa_sleigh_image.get_rect()
-#sleigh_time = pygame.time.get_ticks()
-
 
 #***********************************************************************
 #*                       SNOWFLAKES                                    *
 #***********************************************************************
 
 snowflakes = []  # List to hold snowflake properties
-for _ in range(int(150*SCALE_FACTOR)):
+for _ in range(int(200*SCALE_FACTOR)):
     snowflakes.append({
         "x": random.randint(0, SCREEN_WIDTH),  # Random x position
         "y": random.randint(0, SCREEN_HEIGHT),  # Random y position
@@ -1133,8 +1117,7 @@ for _ in range(int(150*SCALE_FACTOR)):
 #***********************************************************************
 #*                       FIREPLACE/SHIELDS SETUP                       *
 #***********************************************************************
-fireplace_image = pygame.image.load("media/graphics/fireplace_small.png").convert_alpha()
-fireplace_image = scale_image_by(fireplace_image, SCALE_FACTOR, SCALE_FACTOR)
+fireplace_image = load_image("media/graphics/fireplace_small.png", SCALE_FACTOR, SCALE_FACTOR)
 fireplace_width, fireplace_height = fireplace_image.get_size()
 fireplace_width, fireplace_height = fireplace_image.get_size()
 fireplace_y = player_rect.y-fireplace_height-(50*SCALE_FACTOR) 
@@ -1157,14 +1140,12 @@ for i in range (4):
         "mask": pygame.mask.from_surface(fireplace_image),
     }
     fireplaces.append( fireplace )
-#fireplaces_active = True
 
 
 #***********************************************************************
 #*                       PRESENT/ENEMY BULLETS SETUP                   *
 #***********************************************************************
-present_image = pygame.image.load("media/graphics/present_small.png").convert_alpha()
-present_image = scale_image_by(present_image, SCALE_FACTOR, SCALE_FACTOR)
+present_image = load_image("media/graphics/present_small.png", SCALE_FACTOR, SCALE_FACTOR)
 present_mask = pygame.mask.from_surface(present_image)
 present_width, present_height = present_image.get_size()
 present_width, present_height = present_image.get_size()
@@ -1177,30 +1158,25 @@ explosion_graphics =[]
 explosion_list = []
 for i in range(7):
     filename = "media/graphics/explosion"+str(i+1)+".png"
-    explosion =  pygame.image.load(filename).convert_alpha()
-    explosion = scale_image_by(explosion, SCALE_FACTOR, SCALE_FACTOR)
+    explosion =  load_image(filename, SCALE_FACTOR, SCALE_FACTOR)
     explosion_graphics.append(explosion)
-
-
-                
-                
-                
-                
-                
+              
 #***********************************************************************
 #*                       START GAME!!!                                 *
 #***********************************************************************
 
-display_title_screen()
-time.sleep(.5)
+#display_title_screen()
+#time.sleep(.5)
 
-song = random.choice(song_list)
-pygame.mixer.music.load(song)
+#song = random.choice(song_list)
+#pygame.mixer.music.load(song)
 clock = pygame.time.Clock()
-clock.tick(10)
-pygame.mixer.music.play(0)
-clock.tick(10)
-reset_game()
+#pygame.mixer.music.play(0)
+running = True
+#game_data = dict(default_game_data)
+game_data["game_state"] != GAME_STATE_TITLE
+#reset_game(False)
+
 while game_data["game_state"] != GAME_STATE_QUIT:
 
     # Did the user click the window close button?
@@ -1213,7 +1189,7 @@ while game_data["game_state"] != GAME_STATE_QUIT:
             if event.key == pygame.K_p:
                 game_data["game_state"] = GAME_STATE_PAUSED
             if event.key == pygame.K_f:
-                game_data["frame_rate"] = not game_data["frame_rate"]
+                game_data["show_fps"] = not game_data["show_fps"]
         if event.type == END_MUSIC_EVENT:
             play_next_song()
             
@@ -1227,7 +1203,7 @@ while game_data["game_state"] != GAME_STATE_QUIT:
         get_input()
         update()
         detect_collisions()
-        draw_scene(game_data["frame_rate"])
+        draw_scene()
         pygame.display.update()
         check_game_end()
         check_level_end()
