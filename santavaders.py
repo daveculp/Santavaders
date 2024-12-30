@@ -8,17 +8,14 @@ import os
 import getpass
 import sys
 
-
-
 #***********************************************************************
 #*                       FUNCTIONS AREA                                *
 #***********************************************************************
 def play_next_song():
-    #if pygame.mixer.music.get_busy() == False:
     song = random.choice(song_list)
     pygame.mixer.music.load(song)
     pygame.mixer.music.play(0)
-    #print ("Playing: +",song)
+
         
 def stereo_pan(x_pos):
     """Adjust the left and right volume based upon scren ccordinates """
@@ -32,6 +29,7 @@ def stereo_pan(x_pos):
 def play_sound(sound, x_pos):
     """Play passed in sound object on new channel"""
     channel = sound.play()
+    channel.set_volume(1)
     if channel is not None:
         left, right = stereo_pan(x_pos)
         channel.set_volume(left, right)
@@ -45,7 +43,6 @@ def load_image(filename, scale_factor_x, scale_factor_y):
     image = pygame.image.load(filename).convert_alpha()
     return scale_image_by(image, scale_factor_x, scale_factor_y)
     
-
 def display_pause_screen():
     """Render the pause screen and wait for user input."""
     global game_state
@@ -78,14 +75,15 @@ def display_pause_screen():
                     game_data["game_state"] = GAME_STATE_QUIT
                     waiting = False
         
-
 def display_title_screen():
     global game_state
-    #pygame.mixer.music.play(0)
+    pygame.time.wait(1000) #debounce the space bar and wait for sound system
+    #stop all sounds and music during title screen
+    pygame.mixer.stop()
+    pygame.mixer.music.pause()
     screen.blit(title_screen_image, (0, 0))
     pygame.display.flip()
-    waiting = True
-    while waiting:
+    while game_data["game_state"] == GAME_STATE_TITLE:
         keys = pygame.key.get_pressed()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -93,17 +91,13 @@ def display_title_screen():
                 exit()
         
         if keys[pygame.K_SPACE]:
-            waiting = False  # Exit the loop and start the game
             game_data["game_state"] = GAME_STATE_RUNNING
             reset_game(True)
         if keys[pygame.K_ESCAPE]:
-            waiting = False
             game_data["game_state"] = GAME_STATE_QUIT
 
 def reset_game(load_next_level):
-    
     global game_data
-    #print("Resetting game!!")
     # Reset the game data dictionary back to original
     game_data = dict(default_game_data)
     if load_next_level:
@@ -116,7 +110,6 @@ def reset_game(load_next_level):
 HIGH_SCORES_FILE = "highscores.txt"
 
 def load_high_scores():
-    """Load high scores from a file."""
     high_scores = []
     try:
         with open(HIGH_SCORES_FILE, "r") as file:
@@ -129,19 +122,16 @@ def load_high_scores():
     return high_scores
 
 def save_high_scores(high_scores):
-    """Save high scores to a file."""
     with open(HIGH_SCORES_FILE, "w") as file:
         for name, score in high_scores:
             file.write(f"{name},{score}\n")
 
 def update_high_scores(player_name, player_score, high_scores):
-    """Update the high scores with the player's score if it qualifies."""
     high_scores.append((player_name, player_score))
     high_scores = sorted(high_scores, key=lambda x: x[1], reverse=True)[:10]
     return high_scores
 
 def display_high_scores(high_scores, player_name=None, player_score=None):
-    """Display the high scores on the game over screen."""
     y_start = SCREEN_HEIGHT // 14+50*(SCALE_FACTOR)  # Starting y-coordinate
       # Get height of the font and add padding
 
@@ -189,12 +179,8 @@ def game_over():
                 pygame.quit()
                 sys.exit()
     # After 4 seconds, proceed to standard game over screen
-
-
-    # Wait for user input
-    waiting = True
-    
-    while waiting:
+   
+    while game_data["game_state"] == GAME_STATE_GAME_OVER:
         screen.fill((0, 0, 0))  # Clear the screen
         for snowflake in snowflakes:
             snowflake["y"] += snowflake["speed"]*SCALE_FACTOR
@@ -220,16 +206,13 @@ def game_over():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 game_data["game_state"] = GAME_STATE_QUIT
-                waiting = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
                     game_data["game_state"] = GAME_STATE_QUIT
-                    waiting = False
                 if event.key == pygame.K_SPACE:
-                    waiting = False
                     #reset_game(False)
                     game_data["game_state"] = GAME_STATE_TITLE
-                    pygame.time.wait(500)
+                    pygame.time.wait(500) #debounce the space key
         clock.tick(60)
 
 
@@ -237,8 +220,8 @@ def game_over():
 def draw_scene():
     global invaders, star_rect, santa_sleigh_rect, bag_rect
     global player_rect, present_list, fireplaces, game_data 
-    # Fill the background with black
-    screen.fill((0, 0, 0))
+    # Fill the background with background
+    screen.fill((0, 0, 32))
 
 # Draw snowflakes
     for snowflake in snowflakes:
@@ -399,6 +382,7 @@ def update():
             bag_rect.x = santa_sleigh_rect.x
             bag_rect.y = santa_sleigh_rect.y
             game_data["guided_bag_active"] = True
+            play_sound(santa_bag_sound, santa_sleigh_rect.x)
     
     #update player star missile
     if game_data["star_active"]:
@@ -524,6 +508,7 @@ def detect_collisions():
     #detect collsions between the guided missile/bag and the players star
     if game_data["guided_bag_active"] and game_data["star_active"]:
         if bag_rect.colliderect(star_rect):
+            santa_bag_sound.stop()
             game_data["guided_bag_active"] = False
             game_data["star_active"] = False
             game_data["player_score"] += level_data[current_level]["guided_bag_points"]
@@ -887,7 +872,7 @@ for width, height, scale in resolutions:
     if width <= screen_width and height <= screen_height:
         max_resolution = (width, height, scale)
 
-#max_resolution = (1600, 1200,0.78125)
+#max_resolution =(1400, 1050,0.6836)
 print("Best resolution for this screen:", max_resolution)
 LEFT = -1
 RIGHT = 1
@@ -1018,9 +1003,12 @@ santa_shoot_sound.set_volume(1)
 bang_sound = pygame.mixer.Sound("media/sounds/bangMedium.wav")
 bang_sound.set_volume(1)
 
+santa_bag_sound = pygame.mixer.Sound("media/sounds/santa_bag_alarm_loud.wav")
+santa_bag_sound.set_volume(1)
+
 song_list = glob.glob("./media/music/*.mp3")
 
-pygame.mixer.music.set_volume(0.55)
+pygame.mixer.music.set_volume(0.25)
 pygame.mixer.set_num_channels(64)
 
 END_MUSIC_EVENT = pygame.USEREVENT + 0   
@@ -1130,8 +1118,8 @@ fireplace_width, fireplace_height = fireplace_image.get_size()
 fireplace_y = player_rect.y-fireplace_height-(50*SCALE_FACTOR) 
 
 # Calculate the gap width
-total_gap_space = SCREEN_WIDTH - (4 * fireplace_width)
-gap_width = total_gap_space / (5*SCALE_FACTOR)
+total_gap_space = SCREEN_WIDTH - (4 * fireplace_width)  
+gap_width = total_gap_space / (5)
 
 
 fireplaces = []
