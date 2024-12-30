@@ -12,7 +12,11 @@ import sys
 #*                       FUNCTIONS AREA                                *
 #***********************************************************************
 def play_next_song():
+    global current_song
+    
     song = random.choice(song_list)
+    while song == current_song:
+        song = random.choice(song_list)
     pygame.mixer.music.load(song)
     pygame.mixer.music.play(0)
 
@@ -28,12 +32,13 @@ def stereo_pan(x_pos):
 
 def play_sound(sound, x_pos):
     """Play passed in sound object on new channel"""
-    channel = sound.play()
+    channel = pygame.mixer.find_channel().play(sound)
     if channel != None:
         channel.set_volume(.75)
         #if channel is not None:
             #left, right = stereo_pan(x_pos)
             #channel.set_volume(left, right)
+
 
 def scale_image_by(image, scale_factor_x, scale_factor_y):
     height = image.get_height() * scale_factor_y
@@ -154,8 +159,9 @@ def display_high_scores(high_scores, player_name=None, player_score=None):
 
 def game_over():
     global game_data
+    pygame.mixer.stop()
     player_name = getpass.getuser()  # Retrieve player username
-    high_scores = load_high_scores()  # Load current high scores
+    high_scores = load_high_scores()  
 
     # Update the high scores with the player's score
     player_score = game_data["player_score"]
@@ -222,7 +228,7 @@ def draw_scene():
     global invaders, star_rect, santa_sleigh_rect, bag_rect
     global player_rect, present_list, fireplaces, game_data 
     # Fill the background with background
-    screen.fill((0, 0, 32))
+    screen.fill((25, 25, 64))
 
 # Draw snowflakes
     for snowflake in snowflakes:
@@ -376,6 +382,7 @@ def update():
         bag_rect.x += speed_x
         if bag_rect.y > SCREEN_HEIGHT:
             game_data["guided_bag_active"] = False
+            santa_bag_sound.stop()
             
     #spawn a guided bag if necessary
     if game_data["santa_sleigh_active"] and not game_data["guided_bag_active"]:
@@ -492,12 +499,6 @@ def erode_fireplace(fireplace, center, radius):
                 if 0 <= mask_x < fireplace["mask"].get_size()[0] and 0 <= mask_y < fireplace["mask"].get_size()[1]:
                     fireplace["mask"].set_at((mask_x, mask_y), 0)  # Turn the bit off
 
-    """
-    new_surface = pygame.Surface(fireplace["surface"].get_size(), pygame.SRCALPHA)
-    new_surface.fill((0, 0, 0, 0))  # Fully transparent
-    new_surface.blit(fireplace_image, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-    fireplace["surface"] = fireplace["mask"].to_surface(unsetcolor=(0, 0, 0, 0), setcolor=(255, 255, 255, 255))
-    """
 
 def detect_collisions():
     global santa_heads, current_player_image, present_list,game_data
@@ -528,7 +529,10 @@ def detect_collisions():
     if game_data["guided_bag_active"]:
         offset = (bag_rect.x - player_rect.x, bag_rect.y - player_rect.y)
         if current_player_mask.overlap(bag_mask, offset):
+            santa_bag_sound.stop()
             play_sound(bang_sound, player_rect.x)
+            game_data["guided_bag_active"] = False
+            game_data["star_active"] = False
             game_data["is_game_over"] = True
             pygame.time.wait(2000)
             return  # Exit the function immediately after ending the game
@@ -584,11 +588,10 @@ def detect_collisions():
             offset = (bag_rect.x - fireplace["x"], bag_rect.y - fireplace["y"])
             if fireplace["mask"].overlap(bag_mask, offset):
                 game_data["guided_bag_active"] = False
-                # Play explosion sound and add visual feedback
+                play_sound(bang_sound, bag_rect.x)
+                santa_bag_sound.stop()
                 x = bag_rect.centerx - explosion_graphics[0].get_width() // 2
                 y = bag_rect.centery - explosion_graphics[0].get_height() // 2
-                play_sound(bang_sound, x)
-                
                 rect = pygame.Rect(
                     x, y, 
                     explosion_graphics[0].get_width(), 
@@ -767,6 +770,7 @@ def check_level_end():
     
     if not has_active_invaders:
         # Trigger level completion or game state change
+        pygame.mixer.stop()
         pygame.time.wait(3000);
         start_next_level()
 
@@ -774,7 +778,7 @@ def start_next_level():
     global  current_player_image, current_player_mask, star_rect, invaders
     global invaders_pos, present_list, fireplaces, snowflakes
     global game_data, invader_image, invader_width, invader_height
-     
+    
     play_next_song()
     #assume we have not completed all levels and we will not load a
     #random enemy image
@@ -1008,7 +1012,7 @@ santa_bag_sound = pygame.mixer.Sound("media/sounds/santa_bag_alarm_loud.wav")
 santa_bag_sound.set_volume(1)
 
 song_list = glob.glob("./media/music/*.wav")
-
+current_song = None
 pygame.mixer.music.set_volume(0.5)
 pygame.mixer.set_num_channels(64)
 
