@@ -29,7 +29,7 @@ def stereo_pan(x_pos):
 def play_sound(sound, x_pos):
     """Play passed in sound object on new channel"""
     channel = sound.play()
-    channel.set_volume(1)
+    channel.set_volume(.75)
     #if channel is not None:
         #left, right = stereo_pan(x_pos)
         #channel.set_volume(left, right)
@@ -866,7 +866,7 @@ resolutions = [
 pygame.init()
 info = pygame.display.Info()  # Get current display info
 screen_width = info.current_w
-screen_height = info.current_h
+screen_height = info.current_h-250 #a buffer zone to make sure it fits
 max_resolution = (0, 0,0)
 for width, height, scale in resolutions:
     if width <= screen_width and height <= screen_height:
@@ -1006,9 +1006,9 @@ bang_sound.set_volume(1)
 santa_bag_sound = pygame.mixer.Sound("media/sounds/santa_bag_alarm_loud.wav")
 santa_bag_sound.set_volume(1)
 
-song_list = glob.glob("./media/music/*.mp3")
+song_list = glob.glob("./media/music/*.wav")
 
-pygame.mixer.music.set_volume(0.25)
+pygame.mixer.music.set_volume(0.5)
 pygame.mixer.set_num_channels(64)
 
 END_MUSIC_EVENT = pygame.USEREVENT + 0   
