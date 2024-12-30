@@ -18,7 +18,7 @@ def play_next_song():
     song = random.choice(song_list)
     pygame.mixer.music.load(song)
     pygame.mixer.music.play(0)
-    print ("Playing: +",song)
+    #print ("Playing: +",song)
         
 def stereo_pan(x_pos):
     """Adjust the left and right volume based upon scren ccordinates """
@@ -103,7 +103,7 @@ def display_title_screen():
 def reset_game(load_next_level):
     
     global game_data
-    print("Resetting game!!")
+    #print("Resetting game!!")
     # Reset the game data dictionary back to original
     game_data = dict(default_game_data)
     if load_next_level:
@@ -789,7 +789,7 @@ def start_next_level():
     global invaders_pos, present_list, fireplaces, snowflakes
     global game_data, invader_image, invader_width, invader_height
      
-    
+    play_next_song()
     #assume we have not completed all levels and we will not load a
     #random enemy image
     random_image = False
@@ -863,7 +863,7 @@ def start_next_level():
     game_data["fireplaces_active"] = True
         
     game_data["guided_bag_active"] = False
-    play_next_song()
+    
         
         
     
@@ -1172,17 +1172,9 @@ for i in range(7):
 #*                       START GAME!!!                                 *
 #***********************************************************************
 
-#display_title_screen()
-#time.sleep(.5)
-
-#song = random.choice(song_list)
-#pygame.mixer.music.load(song)
 clock = pygame.time.Clock()
-#pygame.mixer.music.play(0)
 running = True
-#game_data = dict(default_game_data)
 game_data["game_state"] != GAME_STATE_TITLE
-#reset_game(False)
 
 while game_data["game_state"] != GAME_STATE_QUIT:
 
