@@ -30,9 +30,9 @@ def play_sound(sound, x_pos):
     """Play passed in sound object on new channel"""
     channel = sound.play()
     channel.set_volume(1)
-    if channel is not None:
-        left, right = stereo_pan(x_pos)
-        channel.set_volume(left, right)
+    #if channel is not None:
+        #left, right = stereo_pan(x_pos)
+        #channel.set_volume(left, right)
 
 def scale_image_by(image, scale_factor_x, scale_factor_y):
     height = image.get_height() * scale_factor_y
