@@ -749,6 +749,13 @@ def get_input():
         if player_rect.x > SCREEN_WIDTH - player_width:
             player_rect.x = SCREEN_WIDTH - player_width
             
+        # cheat code S destroys all invaders
+    if keys[pygame.K_s]:
+        for row in invaders:
+            for invader in row:
+                invader["active"] = False
+        
+            
     # PLayer fire shot
     if keys[pygame.K_SPACE] or keys[pygame.K_UP]:
         if game_data["star_active"] == False:
@@ -999,16 +1006,16 @@ game_data["game_state"] = GAME_STATE_TITLE #set initial game state
 pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 
-santa_sleigh_sound = pygame.mixer.Sound("media/sounds/santa-claus-laughing.ogg")
+santa_sleigh_sound = pygame.mixer.Sound("media/sounds/santa-claus-laughing.wav")
 santa_sleigh_sound.set_volume(1)
 
-player_shoot_sound = pygame.mixer.Sound("media/sounds/bell_shake.ogg")
+player_shoot_sound = pygame.mixer.Sound("media/sounds/bell_shake.wav")
 player_shoot_sound.set_volume(1)
 
-santa_shoot_sound = pygame.mixer.Sound("media/sounds/santa_chuckle.ogg")
+santa_shoot_sound = pygame.mixer.Sound("media/sounds/santa_chuckle.wav")
 santa_shoot_sound.set_volume(1)
 
-bang_sound = pygame.mixer.Sound("media/sounds/bangmedium.ogg")
+bang_sound = pygame.mixer.Sound("media/sounds/bangMedium.wav")
 bang_sound.set_volume(1)
 
 song_list = glob.glob("./media/music/*.mp3")
