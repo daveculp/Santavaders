@@ -28,7 +28,6 @@ def stereo_pan(x_pos):
 
 def play_sound(sound, x_pos):
     """Play passed in sound object on new channel"""
-
     channel = sound.play()
     if channel != None:
         channel.set_volume(.75)
