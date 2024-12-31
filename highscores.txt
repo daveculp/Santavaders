@@ -5,6 +5,6 @@ dwculp,3720
 dwculp,3660
 dwculp,3605
 dwculp,3540
+dwculp,3360
+dwculp,3305
 dwculp,3060
-dwculp,3005
-dwculp,2890
