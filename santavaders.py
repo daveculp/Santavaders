@@ -350,7 +350,6 @@ def update():
                 play_sound(santa_sleigh_sound)
     else: #if santa sleigh is on the screen, update it and check bounds
         santa_sleigh_rect.x += level_data[current_level]["santa_sleigh_speed"]*SCALE_FACTOR
-        print(santa_sleigh_rect)
         if santa_sleigh_rect.x > SCREEN_WIDTH:
             game_data["santa_sleigh_active"] = False
             santa_sleigh_sound.stop()
@@ -458,7 +457,6 @@ def update():
                 alien_bottom = alien_y + invader_height
 
                 if alien_bottom >= playerpos[1]:  # Game Over Condition
-                    print("GAME OVER!!!")
                     game_data["game_state"] = GAME_STATE_GAME_OVER
                     return  # Exit immediately
 
@@ -549,7 +547,7 @@ def detect_collisions():
                 current_player_image = player_image_star
                 current_player_mask = pygame.mask.from_surface(player_image_star)
                 center = (star_rect.centerx, star_rect.centery)
-                erode_fireplace(fireplace, (star_rect.x, star_rect.y), explosion_graphics[0].get_width())
+                erode_fireplace(fireplace, (star_rect.x, star_rect.y), explosion_graphics[0].get_width()//4)
                 game_data["star_active"] = False
                 x = star_rect.centerx - explosion_graphics[0].get_width()//2
                 y = star_rect.centery - explosion_graphics[0].get_height()//2
