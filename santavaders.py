@@ -22,7 +22,7 @@ def play_next_song():
 
         
 def stereo_pan(x_pos):
-    """Adjust the left and right volume based upon scren ccordinates """
+    """Adjust the left and right volume based upon screen cordinates """
     right_volume = float(x_pos) / SCREEN_WIDTH
     left_volume = 1.0 - right_volume
     if game_data["game_sound_state"] == True:
@@ -32,12 +32,9 @@ def stereo_pan(x_pos):
 
 def play_sound(sound, x_pos):
     """Play passed in sound object on new channel"""
-    channel = pygame.mixer.find_channel().play(sound)
-    if channel != None:
-        channel.set_volume(.75)
-        #if channel is not None:
-            #left, right = stereo_pan(x_pos)
-            #channel.set_volume(left, right)
+    channel = sound.play()
+    if channel is not None:
+        channel.set_volume(1)
 
 
 def scale_image_by(image, scale_factor_x, scale_factor_y):
@@ -83,6 +80,7 @@ def display_pause_screen():
         
 def display_title_screen():
     global game_state
+    
     pygame.time.wait(1000) #debounce the space bar and wait for sound system
     #stop all sounds and music during title screen
     pygame.mixer.stop()
@@ -92,10 +90,8 @@ def display_title_screen():
     while game_data["game_state"] == GAME_STATE_TITLE:
         keys = pygame.key.get_pressed()
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-        
+            if event == pygame.QUIT:
+                game_data["game_state"] = GAME_STATE_QUIT
         if keys[pygame.K_SPACE]:
             game_data["game_state"] = GAME_STATE_RUNNING
             reset_game(True)
@@ -169,7 +165,7 @@ def game_over():
     save_high_scores(updated_high_scores)  # Save the updated high scores
 
     # Initial display of the last game scene with GAME OVER text
-    large_font = pygame.font.Font(font_path, 200)  # Set the font size to double the original
+    large_font = pygame.font.Font(font_path, int(200*SCALE_FACTOR))  # Set the font size to double the original
     game_over_text = large_font.render("GAME OVER", True, (255, 0, 0))  # Red text
     game_over_shadow = large_font.render("GAME OVER", True, (0, 255, 0))  # Green shadow
     text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
@@ -249,20 +245,14 @@ def draw_scene():
     if game_data["guided_bag_active"]:
         bag_rect = screen.blit(bag_image, bag_rect)
         
-    #draw the santa heads
+    #draw the invaders and exploding invaders
     for row in range(5):
         for col in range(11):
             if invaders[row][col]["active"]:
                 x = invaders_pos[0] + (col*invader_width) + (invader_width//2)*col 
                 y = invaders_pos[1] + (row*invader_height ) + (invader_height//2) * row
                 invaders[row][col]["rect"] = screen.blit(invader_image, [x, y] )
-
-    #draw the santa heads exploding 
-    for row in range(5):
-        for col in range(11):
-            if invaders[row][col]["exploding"]:
-                if time.time() - invaders[row][col]["explode_time"]< EXPLOSION_FRAME_DURATION:
-                    break
+            if invaders[row][col]["exploding"] and time.time() - invaders[row][col]["explode_time"]> EXPLOSION_FRAME_DURATION:
                 frame = invaders[row][col]["explode_frame"]
                 x_pos = invaders_pos[0] + (col*invader_width) + (invader_width//2)*col 
                 y_pos = invaders_pos[1] + (row*invader_height ) + (invader_height//2) * row
@@ -275,8 +265,8 @@ def draw_scene():
              
     #draw presents if there are active presents in the list
     if present_list:
-        for p, present in enumerate(present_list):
-            present_list[p] = screen.blit(present_image, present )
+        for present in present_list:
+            present = screen.blit(present_image, present )
             #pygame.draw.rect (screen, (0,255,0), present,  2)
 
     #draw fireplaces using the eroded masks
@@ -304,12 +294,11 @@ def draw_scene():
         
     # Render the score text with a shadow effect
     player_score = game_data["player_score"]
-    score_text = font.render(f"Score: {player_score}", True, (255, 0, 0))  # White text
+    score_text = font.render(f"Score: {player_score}", True, (255, 0, 0))  # Red text
     shadow_text = font.render(f"Score: {player_score}", True, (0, 128, 0))  # Green shadow
     
     #shrink the score text by 75%
-    #score_text = pygame.transform.scale_by(score_text, (.75, .75)) 
-    #shadow_text = pygame.transform.scale_by(shadow_text, (.75, .75)) 
+
     score_text = scale_image_by(score_text, .75, .75)
     shadow_text = scale_image_by(shadow_text, .75, .75)
     # Calculate text width and positions
@@ -333,8 +322,8 @@ def draw_scene():
     shadow_text = scale_image_by(shadow_text, .75, .75) 
     # Calculate text width and positions
     text_width = level_text.get_width()
-    x_position = 20
-    y_position = 50
+    x_position = 20 * SCALE_FACTOR
+    y_position = 50 * SCALE_FACTOR
     # Draw shadow slightly offset
     screen.blit(shadow_text, (x_position + 5, y_position + 5))
     # Draw the main text
@@ -374,11 +363,11 @@ def update():
         # Calculate the horizontal distance between the missile and the player
         distance_x = player_rect.centerx - bag_rect.centerx
         # Calculate the scaled speed
-        speed_x = distance_x * .1*SCALE_FACTOR
+        speed_x = (distance_x * .1)*SCALE_FACTOR
         # Ensure the speed does not exceed the maximum allowed speed
         max_speed = 15 * SCALE_FACTOR
         speed_x = max(-max_speed, min(max_speed, speed_x))
-        bag_rect.y += game_data["guided_bag_speed"]
+        bag_rect.y += game_data["guided_bag_speed"] * SCALE_FACTOR
         bag_rect.x += speed_x
         if bag_rect.y > SCREEN_HEIGHT:
             game_data["guided_bag_active"] = False
@@ -473,6 +462,7 @@ def update():
                 if alien_bottom >= playerpos[1]:  # Game Over Condition
                     print("GAME OVER!!!")
                     game_data["is_game_over"] = True
+                    #game_data["game_state"] = GAME_STATE_GAME_OVER
                     return  # Exit immediately
 
                 if game_data["fireplaces_active"] and alien_bottom >= fireplace_y:  # Fireplace Condition
@@ -480,12 +470,7 @@ def update():
                     return  # Exit immediately after deactivating fireplaces
     
 def erode_fireplace(fireplace, center, radius):
-    """
-    Directly modify the fireplace mask by eroding bits in a circular area.
-    :param fireplace: Dictionary containing fireplace data (surface, mask, position).
-    :param center: (x, y) center of the erosion circle in world coordinates.
-    :param radius: Radius of the erosion circle.
-    """
+
     # Convert world coordinates to local mask coordinates
     local_center_x = center[0] - fireplace["x"]
     local_center_y = center[1] - fireplace["y"]
@@ -554,9 +539,7 @@ def detect_collisions():
                         current_player_image = player_image_star
                         current_player_mask = pygame.mask.from_surface(player_image_star)
                         game_data["player_score"] += level_data[current_level]["santa_head_points"]
-                        break
-
-
+                        
     #deal only with active fireplaces                    
     active_fireplaces = [fireplace for fireplace in fireplaces if fireplace["active"]]
     
@@ -752,7 +735,7 @@ def get_input():
         current_player_image = player_image_nostar
         current_player_mask = pygame.mask.from_surface(player_image_nostar)
         play_sound(player_shoot_sound, playerpos[0])
-        x = player_rect.centerx-15
+        x = player_rect.centerx- (15*SCALE_FACTOR)
         y = player_rect.y
         star_rect = pygame.Rect(x, y, star_width, star_height)
         game_data["star_active"] = True 
@@ -807,8 +790,8 @@ def start_next_level():
     game_data["santa_sleigh_active"] = False
     game_data["sleigh_time"] = pygame.time.get_ticks()
     
-    # Reset Santa heads
-    # Initialize santa_heads with dictionaries
+    # Reset Invaders
+    # Initialize invaders with dictionaries
     invaders = [
         [
         {"active": True, 
@@ -829,7 +812,7 @@ def start_next_level():
     invader_width, invader_height = invader_image.get_size()
 
     #reset the postion of the upper left of the enemty formation
-    invaders_pos = [invader_x, 130+(game_data["current_level"]*20)*SCALE_FACTOR]
+    invaders_pos = [0, 120+(game_data["current_level"]*20)*SCALE_FACTOR]
     game_data["invaders_dir"] = LEFT
     
     # Reset presents
@@ -861,6 +844,8 @@ def start_next_level():
 #*                       PYGAME INIT and setup                         *
 #***********************************************************************
 resolutions = [
+    (1024, 768, .5),
+    (1280, 960, .625),
     (1400, 1050,0.6836),
     (1600, 1200,0.78125),
     (1920, 1440,0.9375),
@@ -877,14 +862,14 @@ for width, height, scale in resolutions:
     if width <= screen_width and height <= screen_height:
         max_resolution = (width, height, scale)
 
-#max_resolution =(1400, 1050,0.6836)
+#max_resolution = (1024, 768, .5)
 print("Best resolution for this screen:", max_resolution)
-LEFT = -1
-RIGHT = 1
-
 SCREEN_WIDTH = max_resolution[0]
 SCREEN_HEIGHT = max_resolution[1]
 SCALE_FACTOR = max_resolution[2]
+
+LEFT = -1
+RIGHT = 1
 
 # Set up the drawing window
 screen = pygame.display.set_mode( (SCREEN_WIDTH, SCREEN_HEIGHT) )
@@ -901,9 +886,8 @@ GAME_STATE_PAUSED = 3
 GAME_STATE_QUIT = 4
 GAME_STATE_GAME_OVER = 5
 GAME_STATE_LEVEL_OVER = 6
+
 EXPLOSION_FRAME_DURATION = 0.03
-
-
 
 #***********************************************************************
 #*                       level info                                     *
@@ -1017,9 +1001,8 @@ pygame.mixer.music.set_volume(0.5)
 pygame.mixer.set_num_channels(64)
 
 END_MUSIC_EVENT = pygame.USEREVENT + 0   
-os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (50,50)
 pygame.mixer.music.set_endevent(END_MUSIC_EVENT)
-
+os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (50,50)
 
 #***********************************************************************
 #*                       FONT SETUP                                    *
@@ -1050,7 +1033,7 @@ current_player_mask = pygame.mask.from_surface(player_image_star)
 current_player_image = player_image_star
 
 #set inital postion and velocity
-player_rect.x = SCREEN_WIDTH// 2 - player_width // 2
+player_rect.x = SCREEN_WIDTH // 2 - player_width // 2
 player_rect.y = SCREEN_HEIGHT - player_height
 playerpos = [player_rect.x, player_rect.y]
 
@@ -1073,7 +1056,7 @@ bag_rect = star_image.get_rect()
 bag_mask = pygame.mask.from_surface(bag_image)
 
 #***********************************************************************
-#*                       SANTA HEADS SETUP                             *
+#*                       INVADER SETUP                             *
 #***********************************************************************
 
 invader_image_file = level_data[0]["image_file"]
@@ -1091,9 +1074,7 @@ invaders = [
     for _ in range(5)
 ]
 
-invader_x = (SCREEN_WIDTH - ( (invader_width * 11*SCALE_FACTOR) + (invader_width//2 * 11*SCALE_FACTOR) ) )/2
-invader_x = 0
-invaders_pos = [invader_x, int(150*SCALE_FACTOR)]
+invaders_pos = [0, int(120*SCALE_FACTOR)]
 
 #***********************************************************************
 #*                       SANTA SLEIGH                                  *
@@ -1166,7 +1147,7 @@ for i in range(7):
 #***********************************************************************
 
 clock = pygame.time.Clock()
-running = True
+
 game_data["game_state"] != GAME_STATE_TITLE
 
 while game_data["game_state"] != GAME_STATE_QUIT:
@@ -1204,4 +1185,4 @@ while game_data["game_state"] != GAME_STATE_QUIT:
 # Done! Time to quit.
 print("Goodbye!!")
 pygame.quit()
-sys.exit()
+
