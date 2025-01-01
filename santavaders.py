@@ -13,16 +13,23 @@
 # GNU General Public License for more details.
 #<https://www.gnu.org/licenses/>.
 # ***********************************************************************
-
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import math
 import time
 import random
 import datetime
 import glob 
-import os
 import getpass
 import sys
+
+print("Welcome to Santavaders!")
+print("DO NOT CLOSE THIS WINDOW WHILE GAME IS PLAYING")
+print("Left and Right = Arrow Keys")
+print("Fire = SPACE bar or UP arrow")
+print("Display framerate = 'F' key")
+
 
 #***********************************************************************
 #*                       FUNCTIONS AREA                                *
@@ -40,7 +47,7 @@ def play_sound(sound):
     """Play passed in sound object on new channel"""
     channel = sound.play()
     if channel is not None:
-        channel.set_volume(1)
+        channel.set_volume(sound_volume)
 
 
 def scale_image_by(image, scale_factor_x, scale_factor_y):
@@ -876,6 +883,8 @@ RIGHT = 1
 
 # Set up the drawing window
 screen = pygame.display.set_mode( (SCREEN_WIDTH, SCREEN_HEIGHT) )
+icon = pygame.image.load("media/graphics/santa_saucer_smalll.png")
+pygame.display.set_icon(icon)
 pygame.display.set_caption("Santavaders")
 #***********************************************************************
 #*                       GAME STATE INFO                               *
@@ -999,6 +1008,8 @@ santa_bag_sound.set_volume(1)
 song_list = glob.glob("./media/music/*.wav")
 current_song = None
 pygame.mixer.music.set_volume(0.5)
+
+sound_volume = .5
 pygame.mixer.set_num_channels(64)
 
 END_MUSIC_EVENT = pygame.USEREVENT + 0   
@@ -1066,6 +1077,8 @@ invader_width, invader_height = invader_image.get_size()
 
 invaders = make_invaders_array()
 invaders_pos = [0, int(120*SCALE_FACTOR)]
+
+
 
 #***********************************************************************
 #*                       SANTA SLEIGH                                  *
