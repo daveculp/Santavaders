@@ -1,6 +1,6 @@
 # ***********************************************************************
 # Santavaders Game
-# Copyright (C) [2024 by David Culp
+# Copyright (C) 2024 by David Culp
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -121,9 +121,6 @@ def reset_game(load_next_level):
 # ***********************************************************************
 # *                       HIGH SCORES MANAGEMENT                       *
 # ***********************************************************************
-
-HIGH_SCORES_FILE = "highscores.txt"
-
 def load_high_scores():
     high_scores = []
     try:
@@ -846,13 +843,31 @@ def start_next_level():
 
     game_data["fireplaces_active"] = True
     game_data["guided_bag_active"] = False
-    
-        
-        
+
+# ***********************************************************************
+# *                       GAME STATE INFO                               *
+# ***********************************************************************
+# constants to track game state
+
+
+GAME_STATE_TITLE = 0
+GAME_STATE_RUNNING = 1
+GAME_STATE_END = 2
+GAME_STATE_PAUSED = 3
+GAME_STATE_QUIT = 4
+GAME_STATE_GAME_OVER = 5
+GAME_STATE_LEVEL_OVER = 6
+
+EXPLOSION_FRAME_DURATION = 0.035
+LEFT = -1
+RIGHT = 1
+HIGH_SCORES_FILE = "highscores.txt"
     
 #***********************************************************************
 #*                       PYGAME INIT and setup                         *
 #***********************************************************************
+
+
 resolutions = [
     (1024, 768, .5),
     (1280, 960, .625),
@@ -878,28 +893,12 @@ SCREEN_WIDTH = max_resolution[0]
 SCREEN_HEIGHT = max_resolution[1]
 SCALE_FACTOR = max_resolution[2]
 
-LEFT = -1
-RIGHT = 1
-
 # Set up the drawing window
 screen = pygame.display.set_mode( (SCREEN_WIDTH, SCREEN_HEIGHT) )
 icon = pygame.image.load("media/graphics/santa_saucer_smalll.png")
 pygame.display.set_icon(icon)
 pygame.display.set_caption("Santavaders")
-#***********************************************************************
-#*                       GAME STATE INFO                               *
-#***********************************************************************
-#constants to track game state
 
-GAME_STATE_TITLE = 0
-GAME_STATE_RUNNING = 1
-GAME_STATE_END = 2
-GAME_STATE_PAUSED = 3
-GAME_STATE_QUIT = 4
-GAME_STATE_GAME_OVER = 5
-GAME_STATE_LEVEL_OVER = 6
-
-EXPLOSION_FRAME_DURATION = 0.03
 
 #***********************************************************************
 #*                       level info                                     *
